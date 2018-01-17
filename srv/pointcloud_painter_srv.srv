@@ -1,0 +1,9 @@
+
+sensor_msgs/PointCloud2 input_cloud
+sensor_msgs/Image image_front
+sensor_msgs/Image image_rear
+string image_frame
+
+---
+
+sensor_msgs/PointCloud2 output_cloud
