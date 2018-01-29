@@ -14,6 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs 
   message_generation
   tf
+  cv_bridge
+  image_transport
 )
 find_package(Boost REQUIRED COMPONENTS system)
 
@@ -132,6 +134,14 @@ add_dependencies(
 )
 target_link_libraries(
   pointcloud_painter ${catkin_LIBRARIES}
+)
+
+add_executable(painter_client src/painter_client.cpp)
+add_dependencies(
+   painter_client ${pointcloud_painter_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}
+)
+target_link_libraries(
+  painter_client ${catkin_LIBRARIES}
 )
 
 ## Rename C++ executable without prefix

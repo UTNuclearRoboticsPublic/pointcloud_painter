@@ -1,0 +1,30 @@
+
+<launch>
+	
+	<rosparam  command="load"  file="$(find pointcloud_painter)/param/pointcloud_painter.yaml"/>
+	
+	<node
+		name    = "pointcloud_painter"
+      	pkg     = "pointcloud_painter"
+      	type    = "pointcloud_painter"
+      	output  = "screen"
+  	> 
+	</node>
+
+	<node
+		name    = "painter_client"
+      	pkg     = "pointcloud_painter"
+      	type    = "painter_client"
+      	output  = "screen"
+  	> 
+	</node>
+
+	<node
+		name    = "map_maker_pcs"
+      	pkg     = "pointcloud_processing_server"
+      	type    = "map_maker_pcs"
+      	output  = "screen"
+  	> 
+	</node>
+
+</launch>

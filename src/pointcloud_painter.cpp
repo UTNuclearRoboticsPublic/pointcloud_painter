@@ -4,12 +4,11 @@
 
 PointcloudPainter::PointcloudPainter()
 {
-	ros::NodeHandle nh;
-
 	std::string service_name;
-	nh.param("pointcloud_painter/service_name", service_name);
+	nh_.param<std::string>("/pointcloud_painter/service_name", service_name, "/pointcloud_painter/paint");
+	ROS_INFO_STREAM("[PointcloudPainter] Initializing service with name " << service_name << ".");
 
-	ros::ServiceServer painter = nh.advertiseService(service_name, &PointcloudPainter::paint_pointcloud, this);
+	ros::ServiceServer painter = nh_.advertiseService(service_name, &PointcloudPainter::paint_pointcloud, this);
 
 	ros::spin();
 }
@@ -23,6 +22,10 @@ PointcloudPainter::PointcloudPainter()
 */
 bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_srv::Request &req, pointcloud_painter::pointcloud_painter_srv::Response &res)
 {
+	ROS_INFO_STREAM("[PointcloudPainter] Received call to paint pointcloud!");
+	ROS_INFO_STREAM("[PointcloudPainter]   Input cloud size: " << req.input_cloud.height*req.input_cloud.width);
+	ROS_INFO_STREAM("[PointcloudPainter]   Front image size: " << req.image_front.height << " by " << req.image_front.width);
+	ROS_INFO_STREAM("[PointcloudPainter]   Rear image size: " << req.image_rear.height << " by " << req.image_rear.width);
 
 	// Image Angular Resolution
 	float hor_res; 	// horizontal
@@ -40,8 +43,9 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	}
 	else 
 	{  													// if Transform request times out... Continues WITHOUT TRANSFORM
-		ROS_WARN_THROTTLE(60, "[PointcloudProcessing] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", cloud_frame.c_str(), req.image_frame.c_str());
-		return false;
+		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", cloud_frame.c_str(), req.image_frame.c_str());
+		// un-comment this later...
+		//return false;
 	}
 
 	// ------ Create PCL Pointclouds ------
@@ -64,6 +68,71 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	}
 	// Build cloud from Input Image - XYZRGB cloud fixed on a sphere of the same radius as above
 	pcl::PointCloud<pcl::PointXYZRGB> image_pcl = pcl::PointCloud<pcl::PointXYZRGB>(); // NOTE - although 
+
+	cv_bridge::CvImagePtr cv_ptr_front; 
+	try
+	{
+		cv_ptr_front = cv_bridge::toCvCopy(req.image_front, sensor_msgs::image_encodings::BGR8);
+	}
+	catch(cv_bridge::Exception& e)
+	{
+		ROS_ERROR_STREAM("[PointcloudPainter] cv_bridge exception: " << e.what());
+		return false; 
+	}
+	cv_bridge::CvImagePtr cv_ptr_rear; 
+	try
+	{
+		cv_ptr_rear = cv_bridge::toCvCopy(req.image_rear, sensor_msgs::image_encodings::BGR8);
+	}
+	catch(cv_bridge::Exception& e)
+	{
+		ROS_ERROR_STREAM("[PointcloudPainter] cv_bridge exception: " << e.what());
+		return false; 
+	}
+
+	
+	int image_hgt = req.image_front.height;
+	int image_wdt = req.image_front.width;
+	for(int i=0; i<image_hgt; i++)
+	{
+		for(int j=0; j<image_wdt; j++)
+		{
+			pcl::PointXYZRGB point;
+			point.x = i;
+			point.y = j;
+			point.z = 0;
+
+			// cv_bridge::CVImagePtr->image returns a cv::Mat, which allows pixelwise access
+			//   https://answers.ros.org/question/187649/pointer-image-multi-channel-access/
+			//   Note - data is saved in BGR format (not RGB)
+			point.b = cv_ptr_front->image.at<cv::Vec3b>(i,j)[0];
+			point.g = cv_ptr_front->image.at<cv::Vec3b>(i,j)[1];
+			point.r = cv_ptr_front->image.at<cv::Vec3b>(i,j)[2];
+
+			/*
+			// Do something to extract RGB data at X/Y positions...
+			//float R = req.data[j + i*image_wdt];
+			float R, G, B;
+			float X, Y;
+			X = 
+
+			point.x = 2*X/(1 + pow(X,2) + pow(Y,2));
+			point.y = 2*Y/(1 + pow(X,2) + pow(Y,2));
+			point.z = (-1 + pow(X,2) + pow(Y,2))/(1 + pow(X,2) + pow(Y,2));  */
+
+			image_pcl.points.push_back(point);
+		}
+	}  
+
+	sensor_msgs::PointCloud2 image;
+	pcl::toROSMsg(image_pcl, image);
+	image.header.frame_id = "map";
+	ros::Publisher pub = nh_.advertise<sensor_msgs::PointCloud2>("image_out", 1, this);
+	//while(ros::ok())
+	{
+		pub.publish(image);
+		ros::Duration(5).sleep();
+	}
 
 	// ------ Populate Output Cloud ------
 	for(int i=0; i<input_pcl.points.size(); i++)
@@ -106,7 +175,10 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 
 		// ------------------ SECOND METHOD ------------------
 		// K Nearest Neighbor search for color determination 
+		// might be easiest to operate on image if I convert it to openCV format
+		// BUT probably a lot more useful if I can avoid that because openCV is a pain to compile etc...
 
+		
 
 		output_pcl.points.push_back(point);
 	}
@@ -122,7 +194,7 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 		pcl_ros::transformPointCloud (cloud_frame, res.output_cloud, transformed_cloud, listener);  	// transforms input_pc2 into process_message
 	}
 	else {  													// if Transform request times out... Continues WITHOUT TRANSFORM
-		ROS_WARN_THROTTLE(60, "[PointcloudProcessing] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", req.image_frame.c_str(), cloud_frame.c_str());
+		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", req.image_frame.c_str(), cloud_frame.c_str());
 		return false;
 	}
 

@@ -1,0 +1,4 @@
+
+pointcloud_painter:
+  service_name:     pointcloud_painter/paint
+  should_loop:      false
