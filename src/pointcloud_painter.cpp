@@ -36,10 +36,10 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	// ------ Transform input_cloud to camera_frame ------
 	std::string cloud_frame = req.input_cloud.header.frame_id;
 	tf::TransformListener listener;
-	sensor_msgs::PointCloud2 transformed_cloud;
+	sensor_msgs::PointCloud2 transformed_depth_cloud;
 	if(listener.waitForTransform(cloud_frame, req.image_frame, ros::Time::now(), ros::Duration(0.5)))  
 	{
-		pcl_ros::transformPointCloud (req.image_frame, req.input_cloud, transformed_cloud, listener);  	// transforms input_pc2 into process_message
+		pcl_ros::transformPointCloud (req.image_frame, req.input_cloud, transformed_depth_cloud, listener);  	// transforms input_pc2 into process_message
 	}
 	else 
 	{  													// if Transform request times out... Continues WITHOUT TRANSFORM
@@ -49,9 +49,9 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	}
 
 	// ------ Create PCL Pointclouds ------
-	pcl::PointCloud<pcl::PointXYZ> input_pcl = pcl::PointCloud<pcl::PointXYZ>();
+	pcl::PointCloud<pcl::PointXYZ> input_depth_pcl = pcl::PointCloud<pcl::PointXYZ>();
 	pcl::PointCloud<pcl::PointXYZRGB> output_pcl = pcl::PointCloud<pcl::PointXYZRGB>();
-	pcl::fromROSMsg(transformed_cloud, input_pcl); 	// Initialize input cloud 
+	pcl::fromROSMsg(transformed_depth_cloud, input_depth_pcl); 	// Initialize input cloud 
 
 	// ------ Create PCL Pointclouds for Second Method ------
 	//   These only matter for the K Nearest Neighbors approach (not for interpolation)
@@ -59,15 +59,18 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	float projection_radius = 5; // meters
 	pcl::PointCloud<pcl::PointXYZRGB> input_pcl_projected = pcl::PointCloud<pcl::PointXYZRGB>(); 
 	// Actually perform projection: 
-	for(int i=0; i<input_pcl.points.size(); i++)
+	for(int i=0; i<input_depth_pcl.points.size(); i++)
 	{
-		float distance = sqrt( pow(input_pcl.points[i].x,2) + pow(input_pcl.points[i].y,2) + pow(input_pcl.points[i].z,2) );
-		input_pcl_projected.points[i].x = input_pcl.points[i].x * (projection_radius / distance);
-		input_pcl_projected.points[i].y = input_pcl.points[i].y * (projection_radius / distance);
-		input_pcl_projected.points[i].z = input_pcl.points[i].z * (projection_radius / distance);
+		float distance = sqrt( pow(input_depth_pcl.points[i].x,2) + pow(input_depth_pcl.points[i].y,2) + pow(input_depth_pcl.points[i].z,2) );
+		input_pcl_projected.points[i].x = input_depth_pcl.points[i].x * (projection_radius / distance);
+		input_pcl_projected.points[i].y = input_depth_pcl.points[i].y * (projection_radius / distance);
+		input_pcl_projected.points[i].z = input_depth_pcl.points[i].z * (projection_radius / distance);
 	}
-	// Build cloud from Input Image - XYZRGB cloud fixed on a sphere of the same radius as above
-	pcl::PointCloud<pcl::PointXYZRGB> image_pcl = pcl::PointCloud<pcl::PointXYZRGB>(); // NOTE - although 
+
+	// Build cloud from Input Image - XYZRGB cloud fixed on a flat raster plane
+	pcl::PointCloud<pcl::PointXYZRGB> flat_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>(); 
+	// Build cloud from Input Image - XYZRGB cloud projected back onto life-like sphere of radius given by PROJECTION_RADIUS above 
+	pcl::PointCloud<pcl::PointXYZRGB> spherical_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>(); 
 
 	cv_bridge::CvImagePtr cv_ptr_front; 
 	try
@@ -97,54 +100,78 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	{
 		for(int j=0; j<image_wdt; j++)
 		{
-			pcl::PointXYZRGB point;
-			point.x = i;
-			point.y = j;
-			point.z = 0;
-
+			// ------------------ Create point for flat RGB image cloud ------------------
+			// ----- Create point and set XYZ -----
+			pcl::PointXYZRGB point_flat;
+			point_flat.x = i;
+			point_flat.y = j;
+			point_flat.z = 0;
+			// ----- Set RGB -----
 			// cv_bridge::CVImagePtr->image returns a cv::Mat, which allows pixelwise access
 			//   https://answers.ros.org/question/187649/pointer-image-multi-channel-access/
-			//   Note - data is saved in BGR format (not RGB)
-			point.b = cv_ptr_front->image.at<cv::Vec3b>(i,j)[0];
-			point.g = cv_ptr_front->image.at<cv::Vec3b>(i,j)[1];
-			point.r = cv_ptr_front->image.at<cv::Vec3b>(i,j)[2];
+			//   NOTE - data is saved in BGR format (not RGB)
+			point_flat.b = cv_ptr_front->image.at<cv::Vec3b>(i,j)[0];
+			point_flat.g = cv_ptr_front->image.at<cv::Vec3b>(i,j)[1];
+			point_flat.r = cv_ptr_front->image.at<cv::Vec3b>(i,j)[2];
+			// ----- Add to cloud ----- 
+			flat_image_pcl.points.push_back(point_flat);
 
-			/*
-			// Do something to extract RGB data at X/Y positions...
-			//float R = req.data[j + i*image_wdt];
-			float R, G, B;
-			float X, Y;
-			X = 
-
-			point.x = 2*X/(1 + pow(X,2) + pow(Y,2));
-			point.y = 2*Y/(1 + pow(X,2) + pow(Y,2));
-			point.z = (-1 + pow(X,2) + pow(Y,2))/(1 + pow(X,2) + pow(Y,2));  */
-
-			image_pcl.points.push_back(point);
+			// ------------------ Create point for spherical RGB image cloud
+			pcl::PointXYZRGB point_sphere;
+			// ----- Set RGB -----
+			point_sphere.r = point_flat.r;
+			point_sphere.g = point_flat.g;
+			point_sphere.b = point_flat.b;
+			// ----- Set XYZ -----
+			point_sphere.x = ( 2*point_flat.x/(1 + pow(point_flat.x,2) + pow(point_flat.y,2)) ) * projection_radius;
+			point_sphere.y = ( 2*point_flat.y/(1 + pow(point_flat.x,2) + pow(point_flat.y,2)) ) * projection_radius;
+			point_sphere.z = ( (-1 + pow(point_flat.x,2) + pow(point_flat.y,2))/(1 + pow(point_flat.x,2) + pow(point_flat.y,2)) ) * projection_radius;
+			// ----- Add to cloud -----
+			spherical_image_pcl.points.push_back(point_sphere);
 		}
 	}  
 
+
+
 	sensor_msgs::PointCloud2 image;
-	pcl::toROSMsg(image_pcl, image);
+	pcl::toROSMsg(flat_image_pcl, image);
 	image.header.frame_id = "map";
 	ros::Publisher pub = nh_.advertise<sensor_msgs::PointCloud2>("image_out", 1, this);
-	//while(ros::ok())
+	pub.publish(image);
+
+	pcl::toROSMsg(output_pcl, res.output_cloud);
+
+	//transform output_cloud to cloud_frame
+	if(listener.waitForTransform(req.image_frame, cloud_frame, ros::Time::now(), ros::Duration(0.5)))  
 	{
-		pub.publish(image);
-		ros::Duration(5).sleep();
+		sensor_msgs::PointCloud2 transformed_cloud;
+		pcl_ros::transformPointCloud (cloud_frame, res.output_cloud, transformed_cloud, listener);  	// transforms input_pc2 into process_message
+	}
+	else {  													// if Transform request times out... Continues WITHOUT TRANSFORM
+		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", req.image_frame.c_str(), cloud_frame.c_str());
+		return false;
 	}
 
+	return true;
+}
+
+// ------------------ FIRST METHOD ------------------
+// Assumes clean indexing for square interpolation - might not always be possible (but straightforward for any raster RGB image format)
+// Have to still write the bit to get the bounding four pixels for each LIDAR ray position within the raster grid  
+bool interpolate_colors(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud, pcl::PointCloud<pcl::PointXYZ> &depth_cloud, pcl::PointCloud<pcl::PointXYZRGB> &rgb_cloud, float ver_res, float hor_res)
+{
+	output_cloud->points.clear();
+
 	// ------ Populate Output Cloud ------
-	for(int i=0; i<input_pcl.points.size(); i++)
+	for(int i=0; i<depth_cloud.points.size(); i++)
 	{
 		// ------ Populate XYZ Values ------
 		pcl::PointXYZRGB point;  // Output point 
-		point.x = input_pcl.points[i].x;
-		point.y = input_pcl.points[i].y;
-		point.z = input_pcl.points[i].z;
+		point.x = depth_cloud.points[i].x;
+		point.y = depth_cloud.points[i].y;
+		point.z = depth_cloud.points[i].z;
 
 		// ------------------ FIRST METHOD ------------------
-		/*
 		// Assumes clean indexing for square interpolation - probably not as reasonable to implement
 		// Expect it to be tricky to find the four relevant pixels in RGB image for each target position 
 		// ------ Find Pixels ------
@@ -171,35 +198,59 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 		point.r = r_l + (r_r - r_l)*hor_res/hor_pos;
 		point.g = g_l + (g_r - g_l)*hor_res/hor_pos;
 		point.b = b_l + (b_r - b_l)*hor_res/hor_pos;
-		*/ 
-
-		// ------------------ SECOND METHOD ------------------
-		// K Nearest Neighbor search for color determination 
-		// might be easiest to operate on image if I convert it to openCV format
-		// BUT probably a lot more useful if I can avoid that because openCV is a pain to compile etc...
-
 		
-
-		output_pcl.points.push_back(point);
+		output_cloud->points.push_back(point);
 	}
-
-
-
-	pcl::toROSMsg(output_pcl, res.output_cloud);
-
-	//transform output_cloud to cloud_frame
-	if(listener.waitForTransform(req.image_frame, cloud_frame, ros::Time::now(), ros::Duration(0.5)))  
-	{
-		sensor_msgs::PointCloud2 transformed_cloud;
-		pcl_ros::transformPointCloud (cloud_frame, res.output_cloud, transformed_cloud, listener);  	// transforms input_pc2 into process_message
-	}
-	else {  													// if Transform request times out... Continues WITHOUT TRANSFORM
-		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", req.image_frame.c_str(), cloud_frame.c_str());
-		return false;
-	}
-
-	return true;
 }
+
+// ------------------ SECOND METHOD ------------------
+// K Nearest Neighbor search for color determination 
+// might be easiest to operate on image if I convert it to openCV format
+// BUT probably a lot more useful if I can avoid that because openCV is a pain to compile etc...
+bool neighbor_color_search(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &depth_cloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &rgb_cloud, float ver_res, float hor_res, int k)
+{
+	pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
+	kdtree.setInputCloud(rgb_cloud);
+
+	for(int i=0; i<depth_cloud->points.size(); i++)
+	{
+		// Create a new point, assign the XYZ positions from depth_cloud
+		pcl::PointXYZRGB point;
+		point.x = depth_cloud->points[i].x;
+		point.y = depth_cloud->points[i].y;
+		point.z = depth_cloud->points[i].z;
+
+		std::vector<int> nearest_indices(k); 			// Indices (within RGB cloud) of neighbors to target point
+		std::vector<float> nearest_dist_squareds(k);	// Distances (within RGB cloud) of neighbors to target point
+
+		if ( kdtree.nearestKSearch (point, k, nearest_indices, nearest_dist_squareds) > 0 )
+		{
+			// Currently, just assign colors as inverse-distance weighted average of neighbor colors
+			float dist_total = 0;
+			// Iterate over each neighbor
+			for(int j=0; j<nearest_indices.size(); j++)
+			{
+				// For each neighbor, add its weighted color to the total for the target point
+				float dist = pow(nearest_dist_squareds[j],0.5);
+				point.r += rgb_cloud->points[nearest_indices[j]].r / dist;
+				point.g += rgb_cloud->points[nearest_indices[j]].g / dist;
+				point.b += rgb_cloud->points[nearest_indices[j]].b / dist;
+				// Increment the total distance by the distance to this neighbor
+				dist_total += dist;
+			}
+			// Correct for distance weights!
+			point.r *= dist_total;
+			point.g *= dist_total;
+			point.b *= dist_total;
+			// Add new point to output cloud
+			output_cloud->points.push_back(point);
+		}
+		else 
+			ROS_ERROR_STREAM_THROTTLE(0.1, "[PointcloudPainter] KdTree Nearest Neighbor search failed! Unable to find neighbors for point " << i << "with XYZ values " << depth_cloud->points[i].x << " " << depth_cloud->points[i].y << " " << depth_cloud->points[i].z << ". This message is throttled...");
+	}
+			
+}
+
 
 int main(int argc, char** argv)
 {

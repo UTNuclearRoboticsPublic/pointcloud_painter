@@ -21,6 +21,8 @@
 #include <rosbag/view.h>
 #include <boost/foreach.hpp>
 
+#include <pcl/kdtree/kdtree_flann.h>
+
 class PointcloudPainter
 {
 public:
