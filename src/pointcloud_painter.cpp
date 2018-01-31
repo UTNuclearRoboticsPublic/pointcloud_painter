@@ -33,17 +33,19 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 
 	//tf2::Transform transform_to_image;
 
+	std::string image_frame = req.image_front.header.frame_id;
+
 	// ------ Transform input_cloud to camera_frame ------
 	std::string cloud_frame = req.input_cloud.header.frame_id;
 	tf::TransformListener listener;
 	sensor_msgs::PointCloud2 transformed_depth_cloud;
-	if(listener.waitForTransform(cloud_frame, req.image_frame, ros::Time::now(), ros::Duration(0.5)))  
+	if(listener.waitForTransform(cloud_frame, image_frame, ros::Time::now(), ros::Duration(0.5)))  
 	{
-		pcl_ros::transformPointCloud (req.image_frame, req.input_cloud, transformed_depth_cloud, listener);  	// transforms input_pc2 into process_message
+		pcl_ros::transformPointCloud (image_frame, req.input_cloud, transformed_depth_cloud, listener);  	// transforms input_pc2 into process_message
 	}
 	else 
 	{  													// if Transform request times out... Continues WITHOUT TRANSFORM
-		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", cloud_frame.c_str(), req.image_frame.c_str());
+		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", cloud_frame.c_str(), image_frame.c_str());
 		// un-comment this later...
 		//return false;
 	}
@@ -56,21 +58,20 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	// ------ Create PCL Pointclouds for Second Method ------
 	//   These only matter for the K Nearest Neighbors approach (not for interpolation)
 	// Input Cloud - projected onto a sphere of fixed radius
-	float projection_radius = 5; // meters
 	pcl::PointCloud<pcl::PointXYZRGB> input_pcl_projected = pcl::PointCloud<pcl::PointXYZRGB>(); 
 	// Actually perform projection: 
 	for(int i=0; i<input_depth_pcl.points.size(); i++)
 	{
 		float distance = sqrt( pow(input_depth_pcl.points[i].x,2) + pow(input_depth_pcl.points[i].y,2) + pow(input_depth_pcl.points[i].z,2) );
-		input_pcl_projected.points[i].x = input_depth_pcl.points[i].x * (projection_radius / distance);
-		input_pcl_projected.points[i].y = input_depth_pcl.points[i].y * (projection_radius / distance);
-		input_pcl_projected.points[i].z = input_depth_pcl.points[i].z * (projection_radius / distance);
+		input_pcl_projected.points[i].x = input_depth_pcl.points[i].x / distance;
+		input_pcl_projected.points[i].y = input_depth_pcl.points[i].y / distance;
+		input_pcl_projected.points[i].z = input_depth_pcl.points[i].z / distance;
 	}
 
 	// Build cloud from Input Image - XYZRGB cloud fixed on a flat raster plane
-	pcl::PointCloud<pcl::PointXYZRGB> flat_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>(); 
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr flat_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>); 
 	// Build cloud from Input Image - XYZRGB cloud projected back onto life-like sphere of radius given by PROJECTION_RADIUS above 
-	pcl::PointCloud<pcl::PointXYZRGB> spherical_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>(); 
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr spherical_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>);
 
 	cv_bridge::CvImagePtr cv_ptr_front; 
 	try
@@ -93,66 +94,144 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 		return false; 
 	}
 
-	
-	int image_hgt = req.image_front.height;
-	int image_wdt = req.image_front.width;
+	build_image_clouds(flat_image_pcl, spherical_image_pcl, cv_ptr_front, req.projection, req.max_angle, req.image_front.height, req.image_rear.width, false);
+	build_image_clouds(flat_image_pcl, spherical_image_pcl, cv_ptr_rear, req.projection, req.max_angle, req.image_front.height, req.image_rear.height, true);
+
+	pcl::VoxelGrid<pcl::PointXYZRGB> vg;
+	vg.setInputCloud(flat_image_pcl);
+	vg.setLeafSize(5.0, 5.0, 5.0);
+	// Apply Filter and return Voxelized Data
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_pcp = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
+	vg.filter(*temp_pcp);
+	*flat_image_pcl = *temp_pcp;
+
+	vg.setInputCloud(spherical_image_pcl);
+	vg.setLeafSize(.01, .01, .01);
+	// Apply Filter and return Voxelized Data
+	temp_pcp->points.clear();
+	//vg.filter(*temp_pcp);
+	//*spherical_image_pcl = *temp_pcp;
+
+
+	sensor_msgs::PointCloud2 image_flat_out;
+	pcl::toROSMsg(*flat_image_pcl, image_flat_out);
+	image_flat_out.header.frame_id = "map";
+	ros::Publisher pub_flat = nh_.advertise<sensor_msgs::PointCloud2>("image_out_flat", 1, this);
+	pub_flat.publish(image_flat_out);
+
+	sensor_msgs::PointCloud2 image_sphere_out;
+	pcl::toROSMsg(*spherical_image_pcl, image_sphere_out);
+	image_sphere_out.header.frame_id = "map";
+	ros::Publisher pub_sphere = nh_.advertise<sensor_msgs::PointCloud2>("image_out_sphere", 1, this);
+	pub_sphere.publish(image_sphere_out);
+
+
+	pcl::toROSMsg(output_pcl, res.output_cloud);
+
+	//transform output_cloud to cloud_frame
+	if(listener.waitForTransform(image_frame, cloud_frame, ros::Time::now(), ros::Duration(0.5)))  
+	{
+		sensor_msgs::PointCloud2 transformed_cloud;
+		pcl_ros::transformPointCloud (cloud_frame, res.output_cloud, transformed_cloud, listener);  	// transforms input_pc2 into process_message
+	}
+	else {  													// if Transform request times out... Continues WITHOUT TRANSFORM
+		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", image_frame.c_str(), cloud_frame.c_str());
+		return false;
+	}
+
+	return true;
+}
+
+bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_flat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_spherical, cv_bridge::CvImagePtr cv_image, int projection, float max_angle, int image_hgt, int image_wdt, bool flip_cloud)
+{
+	// Determine real image dimensions (to project properly to a R=1m sphere)
+	float plane_width, X_max_dist;
+	switch(projection)
+	{
+		case 1:
+			// X position on the sphere where the highest angle allowed by the lens penetrates it from the origin:
+			X_max_dist = cos( (max_angle-180)/2 ); 	
+			// maximum width of planar projection such that it will wrap properly to a R=1m sphere (since lenses do not have a 360 FOV, and blank areas are omitted from file)
+			plane_width = 2*X_max_dist/( 1+pow(X_max_dist,2) );
+		case 2:
+			// X position on the sphere where the highest angle allowed by the lens penetrates it from the origin:
+			X_max_dist = cos( (max_angle-180)/2 ); 	
+			// maximum width of planar projection such that it will wrap properly to a R=1m sphere (since lenses do not have a 360 FOV, and blank areas are omitted from file)
+			plane_width = 2*X_max_dist/( 1+pow(X_max_dist,2) );
+		case 3:
+			// X and Z position on the sphere where the highest angle allowed by the lens penetrates it from the origin:
+			X_max_dist = cos( (max_angle-180)/2 ); 	
+			float Z_max_dist = sin( (max_angle-180)/2 );
+			// maximum width of planar projection such that it will wrap properly to a R=1m sphere (since lenses do not have a 360 FOV, and blank areas are omitted from file)
+			plane_width = sqrt(2/(1-Z_max_dist)) * X_max_dist;
+	}
+	// ------------------ Process Front Cloud ------------------
 	for(int i=0; i<image_hgt; i++)
 	{
 		for(int j=0; j<image_wdt; j++)
 		{
 			// ------------------ Create point for flat RGB image cloud ------------------
 			// ----- Create point and set XYZ -----
+			// Results in an image that is 1x1m, centered at origin, normal in Z
 			pcl::PointXYZRGB point_flat;
-			point_flat.x = i;
-			point_flat.y = j;
+			point_flat.x = float(i-image_hgt/2) / image_hgt;
+			point_flat.y = float(j-image_wdt/2) / image_wdt;
 			point_flat.z = 0;
 			// ----- Set RGB -----
 			// cv_bridge::CVImagePtr->image returns a cv::Mat, which allows pixelwise access
 			//   https://answers.ros.org/question/187649/pointer-image-multi-channel-access/
 			//   NOTE - data is saved in BGR format (not RGB)
-			point_flat.b = cv_ptr_front->image.at<cv::Vec3b>(i,j)[0];
-			point_flat.g = cv_ptr_front->image.at<cv::Vec3b>(i,j)[1];
-			point_flat.r = cv_ptr_front->image.at<cv::Vec3b>(i,j)[2];
-			// ----- Add to cloud ----- 
-			flat_image_pcl.points.push_back(point_flat);
+			point_flat.b = cv_image->image.at<cv::Vec3b>(i,j)[0];
+			point_flat.g = cv_image->image.at<cv::Vec3b>(i,j)[1];
+			point_flat.r = cv_image->image.at<cv::Vec3b>(i,j)[2];
 
-			// ------------------ Create point for spherical RGB image cloud
+			// ------------------ Create point for spherical RGB image cloud ------------------
 			pcl::PointXYZRGB point_sphere;
 			// ----- Set RGB -----
 			point_sphere.r = point_flat.r;
 			point_sphere.g = point_flat.g;
 			point_sphere.b = point_flat.b;
 			// ----- Set XYZ -----
-			point_sphere.x = ( 2*point_flat.x/(1 + pow(point_flat.x,2) + pow(point_flat.y,2)) ) * projection_radius;
-			point_sphere.y = ( 2*point_flat.y/(1 + pow(point_flat.x,2) + pow(point_flat.y,2)) ) * projection_radius;
-			point_sphere.z = ( (-1 + pow(point_flat.x,2) + pow(point_flat.y,2))/(1 + pow(point_flat.x,2) + pow(point_flat.y,2)) ) * projection_radius;
-			// ----- Add to cloud -----
-			spherical_image_pcl.points.push_back(point_sphere);
+			switch(projection)
+			{
+				float xs, ys;
+				case 1:
+					// Account for FOV lens angle being less than 360 degrees
+					xs = (float(i)/image_hgt - 0.5) * plane_width;
+					ys = (float(j)/image_wdt - 0.5) * plane_width;
+					// Perform projection
+					point_sphere.x = ( 2*xs/(1 + pow(xs,2) + pow(ys,2)) );
+					point_sphere.y = ( 2*ys/(1 + pow(xs,2) + pow(ys,2)) );
+					point_sphere.z = ( (-1 + pow(xs,2) + pow(ys,2))/(1 + pow(xs,2) + pow(ys,2)) );
+				case 2:
+					// Account for FOV lens angle being less than 360 degrees
+					xs = (float(i)/image_hgt - 0.5) * plane_width;
+					ys = (float(j)/image_wdt - 0.5) * plane_width;
+					// Perform projection
+					point_sphere.x = ( 2*xs/(1 + pow(xs,2) + pow(ys,2)) );
+					point_sphere.y = ( 2*ys/(1 + pow(xs,2) + pow(ys,2)) );
+					point_sphere.z = ( (-1 + pow(xs,2) + pow(ys,2))/(1 + pow(xs,2) + pow(ys,2)) );
+				case 3:
+					// Account for FOV lens angle being less than 360 degrees
+					xs = (float(i)/image_hgt - 0.5) * plane_width;
+					ys = (float(j)/image_wdt - 0.5) * plane_width;
+					// Perform projection
+					point_sphere.x = sqrt( 1 - (pow(xs,2) + pow(ys,2))/4 ) * xs;
+					point_sphere.y = sqrt( 1 - (pow(xs,2) + pow(ys,2))/4 ) * ys;
+					point_sphere.z = ( -1 + (pow(xs,2) + pow(ys,2))/2 );
+			}
+
+			if(flip_cloud)
+			{
+				point_flat.x += image_hgt;
+				point_sphere.z *= -1;
+			}
+
+			// ------------------ Add to cloud ------------------
+			pcl_flat->points.push_back(point_flat);
+			pcl_spherical->points.push_back(point_sphere);
 		}
-	}  
-
-
-
-	sensor_msgs::PointCloud2 image;
-	pcl::toROSMsg(flat_image_pcl, image);
-	image.header.frame_id = "map";
-	ros::Publisher pub = nh_.advertise<sensor_msgs::PointCloud2>("image_out", 1, this);
-	pub.publish(image);
-
-	pcl::toROSMsg(output_pcl, res.output_cloud);
-
-	//transform output_cloud to cloud_frame
-	if(listener.waitForTransform(req.image_frame, cloud_frame, ros::Time::now(), ros::Duration(0.5)))  
-	{
-		sensor_msgs::PointCloud2 transformed_cloud;
-		pcl_ros::transformPointCloud (cloud_frame, res.output_cloud, transformed_cloud, listener);  	// transforms input_pc2 into process_message
 	}
-	else {  													// if Transform request times out... Continues WITHOUT TRANSFORM
-		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Returning paint_pointcloud service unsuccessfully...", req.image_frame.c_str(), cloud_frame.c_str());
-		return false;
-	}
-
-	return true;
 }
 
 // ------------------ FIRST METHOD ------------------

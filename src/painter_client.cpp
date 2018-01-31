@@ -92,38 +92,20 @@ int main(int argc, char** argv)
 
     ROS_INFO_STREAM("fkjljwe " << rear_image.height << " " << rear_image.width);
 
-/*
-    // ------------- Second Bag - REAR IMAGE -------------
-    sensor_msgs::Image rear_image;
-	rosbag::Bag rear_bag; 
-	rear_bag.open(rear_bag_name, rosbag::bagmode::Read);
-
-	std::vector<std::string> rear_topics;
-	rear_topics.push_back(rear_bag_topic);
-	rosbag::View view_rear(rear_bag, rosbag::TopicQuery(rear_topics));
-
-	BOOST_FOREACH(rosbag::MessageInstance const m, view_rear)
-    {
-        sensor_msgs::Image::ConstPtr rear_ptr = m.instantiate<sensor_msgs::Image>();
-        if (rear_ptr != NULL)
-            front_image = *rear_ptr;
-        else
-        	ROS_ERROR_STREAM("[PointcloudPainter] Rear image retrieved from bag is null...");
-    }
-    rear_bag.close(); */
-
 	// Set up service object
 	pointcloud_painter::pointcloud_painter_srv srv;
 	srv.request.input_cloud = pointcloud;
 	srv.request.image_front = front_image;
 	srv.request.image_rear = rear_image;
+	srv.request.projection = 2;
+	srv.request.max_angle = 235;
 
 	// Run Service
 	while(ros::ok())
 	{
 
 		// Wait a moment to ensure that the service is up...
-		ros::Duration(2.0).sleep();
+		ros::Duration(1.0).sleep();
 	
 		while(ros::ok())
 		{
@@ -134,8 +116,8 @@ int main(int argc, char** argv)
 			{	
 				ROS_INFO_STREAM("[PointcloudPainter] Successfully called painting service.");
 				ROS_INFO_STREAM("[PointcloudPainter]   Cloud Size: " << srv.response.output_cloud.height*srv.response.output_cloud.width);
+				ros::Duration(0.5).sleep();
 			}
-			ros::Duration(0.5).sleep();
 		}
 
 		// If we shouldn't loop, break the loop
@@ -143,6 +125,4 @@ int main(int argc, char** argv)
 			break;
 	}	
 	
-	ros::Duration(1.0).sleep();
-
 }	

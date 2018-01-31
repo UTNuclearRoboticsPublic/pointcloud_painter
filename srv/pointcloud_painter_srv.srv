@@ -1,8 +1,18 @@
 
+# ---------------- Data ----------------
 sensor_msgs/PointCloud2 input_cloud
 sensor_msgs/Image image_front
 sensor_msgs/Image image_rear
-string image_frame
+
+# ---------------- Camera Lens Properties ----------------
+# NOTE - most image properties (height/width/frame/etc) given in image message 
+# Specify projection type of lens 
+#   1 -> EQUATORIAL STEROGRAPHIC 		 (Equidistant / Equal-angle / Stereographic Projection)
+#   2 -> POLE-TANGENT STEREOGRAPHIC 	 (Equidistant / Equal-angle / Stereographic Projection)
+#   3 -> LAMBERT ZENITHAL EQUAL AREA   	 (Equisolid   / Equal-area  / Lambert Azimuthal / Lambert Zenithal)
+int32 projection
+# Maximum FOV angle used by lens (degrees):
+float32 max_angle
 
 ---
 
