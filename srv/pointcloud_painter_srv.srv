@@ -14,6 +14,10 @@ int32 projection
 # Maximum FOV angle used by lens (degrees):
 float32 max_angle
 
+# ---------------- Processing ----------------
+float32 flat_voxel_size
+float32 spherical_voxel_size
+
 ---
 
 sensor_msgs/PointCloud2 output_cloud

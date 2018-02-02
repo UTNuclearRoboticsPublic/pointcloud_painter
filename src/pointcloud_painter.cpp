@@ -97,21 +97,23 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	build_image_clouds(flat_image_pcl, spherical_image_pcl, cv_ptr_front, req.projection, req.max_angle, req.image_front.height, req.image_rear.width, false);
 	build_image_clouds(flat_image_pcl, spherical_image_pcl, cv_ptr_rear, req.projection, req.max_angle, req.image_front.height, req.image_rear.height, true);
 
+	ROS_ERROR_STREAM("size: " << spherical_image_pcl->points.size() << " example: " << spherical_image_pcl->points[0].x << " " << spherical_image_pcl->points[0].y << " " << spherical_image_pcl->points[0].z);
 	pcl::VoxelGrid<pcl::PointXYZRGB> vg;
 	vg.setInputCloud(flat_image_pcl);
-	vg.setLeafSize(5.0, 5.0, 5.0);
+	vg.setLeafSize(req.flat_voxel_size, req.flat_voxel_size, req.flat_voxel_size);
 	// Apply Filter and return Voxelized Data
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_pcp = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
 	vg.filter(*temp_pcp);
 	*flat_image_pcl = *temp_pcp;
 
 	vg.setInputCloud(spherical_image_pcl);
-	vg.setLeafSize(.01, .01, .01);
+	vg.setLeafSize(req.spherical_voxel_size, req.spherical_voxel_size, req.spherical_voxel_size);
 	// Apply Filter and return Voxelized Data
 	temp_pcp->points.clear();
-	//vg.filter(*temp_pcp);
-	//*spherical_image_pcl = *temp_pcp;
-
+	vg.filter(*temp_pcp);
+	*spherical_image_pcl = *temp_pcp;
+	
+	ROS_ERROR_STREAM("size: " << spherical_image_pcl->points.size() << " example: " << spherical_image_pcl->points[0].x << " " << spherical_image_pcl->points[0].y << " " << spherical_image_pcl->points[0].z);
 
 	sensor_msgs::PointCloud2 image_flat_out;
 	pcl::toROSMsg(*flat_image_pcl, image_flat_out);
@@ -145,23 +147,25 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_flat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_spherical, cv_bridge::CvImagePtr cv_image, int projection, float max_angle, int image_hgt, int image_wdt, bool flip_cloud)
 {
 	// Determine real image dimensions (to project properly to a R=1m sphere)
-	float plane_width, X_max_dist;
+	float plane_width, X_max_dist, Z_max_dist;
 	switch(projection)
 	{
 		case 1:
 			// X position on the sphere where the highest angle allowed by the lens penetrates it from the origin:
-			X_max_dist = cos( (max_angle-180)/2 ); 	
+			X_max_dist = cos( (max_angle-180)/2 *3.14159/180 ); 	
+			Z_max_dist = sin( (max_angle-180)/2 *3.14159/180 );
 			// maximum width of planar projection such that it will wrap properly to a R=1m sphere (since lenses do not have a 360 FOV, and blank areas are omitted from file)
-			plane_width = 2*X_max_dist/( 1+pow(X_max_dist,2) );
+			plane_width = X_max_dist/(1 - Z_max_dist);
 		case 2:
 			// X position on the sphere where the highest angle allowed by the lens penetrates it from the origin:
-			X_max_dist = cos( (max_angle-180)/2 ); 	
+			X_max_dist = cos( (max_angle-180)/2 *3.14159/180 );
+			Z_max_dist = sin( (max_angle-180)/2 *3.14159/180 );
 			// maximum width of planar projection such that it will wrap properly to a R=1m sphere (since lenses do not have a 360 FOV, and blank areas are omitted from file)
-			plane_width = 2*X_max_dist/( 1+pow(X_max_dist,2) );
+			plane_width = X_max_dist/(1 - Z_max_dist) *2;
 		case 3:
 			// X and Z position on the sphere where the highest angle allowed by the lens penetrates it from the origin:
-			X_max_dist = cos( (max_angle-180)/2 ); 	
-			float Z_max_dist = sin( (max_angle-180)/2 );
+			X_max_dist = cos( (-90 + (max_angle-180)) *3.14159/180);
+			Z_max_dist = 1 - sin( (-90 + (max_angle-180)) *3.14159/180);
 			// maximum width of planar projection such that it will wrap properly to a R=1m sphere (since lenses do not have a 360 FOV, and blank areas are omitted from file)
 			plane_width = sqrt(2/(1-Z_max_dist)) * X_max_dist;
 	}
@@ -197,24 +201,24 @@ bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Pt
 				float xs, ys;
 				case 1:
 					// Account for FOV lens angle being less than 360 degrees
-					xs = (float(i)/image_hgt - 0.5) * plane_width;
-					ys = (float(j)/image_wdt - 0.5) * plane_width;
+					xs = (float(i)/image_hgt - 0.5) * plane_width * 2;
+					ys = (float(j)/image_wdt - 0.5) * plane_width * 2;
 					// Perform projection
 					point_sphere.x = ( 2*xs/(1 + pow(xs,2) + pow(ys,2)) );
 					point_sphere.y = ( 2*ys/(1 + pow(xs,2) + pow(ys,2)) );
 					point_sphere.z = ( (-1 + pow(xs,2) + pow(ys,2))/(1 + pow(xs,2) + pow(ys,2)) );
 				case 2:
 					// Account for FOV lens angle being less than 360 degrees
-					xs = (float(i)/image_hgt - 0.5) * plane_width;
-					ys = (float(j)/image_wdt - 0.5) * plane_width;
+					xs = (float(i)/image_hgt - 0.5) * plane_width * 4;
+					ys = (float(j)/image_wdt - 0.5) * plane_width * 4;
 					// Perform projection
 					point_sphere.x = ( 2*xs/(1 + pow(xs,2) + pow(ys,2)) );
 					point_sphere.y = ( 2*ys/(1 + pow(xs,2) + pow(ys,2)) );
 					point_sphere.z = ( (-1 + pow(xs,2) + pow(ys,2))/(1 + pow(xs,2) + pow(ys,2)) );
 				case 3:
 					// Account for FOV lens angle being less than 360 degrees
-					xs = (float(i)/image_hgt - 0.5) * plane_width;
-					ys = (float(j)/image_wdt - 0.5) * plane_width;
+					xs = (float(i)/image_hgt - 0.5) * plane_width * 2;
+					ys = (float(j)/image_wdt - 0.5) * plane_width * 2;
 					// Perform projection
 					point_sphere.x = sqrt( 1 - (pow(xs,2) + pow(ys,2))/4 ) * xs;
 					point_sphere.y = sqrt( 1 - (pow(xs,2) + pow(ys,2))/4 ) * ys;
@@ -225,6 +229,7 @@ bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Pt
 			{
 				point_flat.x += image_hgt;
 				point_sphere.z *= -1;
+				point_sphere.y *= -1;
 			}
 
 			// ------------------ Add to cloud ------------------

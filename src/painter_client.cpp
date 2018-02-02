@@ -16,8 +16,19 @@ int main(int argc, char** argv)
 	nh.param<std::string>("/pointcloud_painter/service_name", service_name, "/pointcloud_painter/paint");
 	ros::ServiceClient painter_srv = nh.serviceClient<pointcloud_painter::pointcloud_painter_srv>(service_name);
 
+	// Maximum angle viewable through the lens 
+	float max_lens_angle;
+	nh.param<float>("/pointcloud_painter/max_lens_angle", max_lens_angle, 235);
+	// Type of projection (see pointcloud_painter/pointcloud_painter_srv)
+	int projection_type;
+	nh.param<int>("/pointcloud_painter/projection_type", projection_type, 2);
+	// Should this process loop? 
 	bool should_loop;
 	nh.param<bool>("/pointcloud_painter/should_loop", should_loop);
+	// Voxel sizes for image postprocessing
+	float flat_voxel_size, spherical_voxel_size;
+	nh.param<float>("/pointcloud_painter/flat_voxel_size", flat_voxel_size, 0.005);
+	nh.param<float>("/pointcloud_painter/spherical_voxel_size", spherical_voxel_size, 0.005);
 
 	// ---------------------------------------------------------------------------
 	// ------------------------ Extract Data from ROSBAGs ------------------------
@@ -97,8 +108,10 @@ int main(int argc, char** argv)
 	srv.request.input_cloud = pointcloud;
 	srv.request.image_front = front_image;
 	srv.request.image_rear = rear_image;
-	srv.request.projection = 2;
-	srv.request.max_angle = 235;
+	srv.request.projection = projection_type;
+	srv.request.max_angle = max_lens_angle;
+	srv.request.flat_voxel_size = flat_voxel_size;
+	srv.request.spherical_voxel_size = spherical_voxel_size;
 
 	// Run Service
 	while(ros::ok())
@@ -106,18 +119,15 @@ int main(int argc, char** argv)
 
 		// Wait a moment to ensure that the service is up...
 		ros::Duration(1.0).sleep();
-	
-		while(ros::ok())
-		{
-			// Call service
-			if( ! painter_srv.call(srv) )
-				ROS_WARN_STREAM("[PointcloudPainter] Painting service call failed - prob not up yet");
-			else
-			{	
-				ROS_INFO_STREAM("[PointcloudPainter] Successfully called painting service.");
-				ROS_INFO_STREAM("[PointcloudPainter]   Cloud Size: " << srv.response.output_cloud.height*srv.response.output_cloud.width);
-				ros::Duration(0.5).sleep();
-			}
+
+		// Call service
+		if( ! painter_srv.call(srv) )
+			ROS_WARN_STREAM("[PointcloudPainter] Painting service call failed - prob not up yet");
+		else
+		{	
+			ROS_INFO_STREAM("[PointcloudPainter] Successfully called painting service.");
+			ROS_INFO_STREAM("[PointcloudPainter]   Cloud Size: " << srv.response.output_cloud.height*srv.response.output_cloud.width);
+			ros::Duration(0.5).sleep();
 		}
 
 		// If we shouldn't loop, break the loop

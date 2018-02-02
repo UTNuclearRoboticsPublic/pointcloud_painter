@@ -2,3 +2,7 @@
 pointcloud_painter:
   service_name:     pointcloud_painter/paint
   should_loop:      false
+  max_lens_angle:   235
+  projection_type:  2
+  flat_voxel_size:      0.005
+  spherical_voxel_size: 0.005
