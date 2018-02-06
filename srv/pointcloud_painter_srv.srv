@@ -17,6 +17,9 @@ float32 max_angle
 # ---------------- Processing ----------------
 float32 flat_voxel_size
 float32 spherical_voxel_size
+string camera_frame_front
+string camera_frame_rear
+string target_frame
 
 ---
 

@@ -2,7 +2,10 @@
 pointcloud_painter:
   service_name:     pointcloud_painter/paint
   should_loop:      false
-  max_lens_angle:   235
-  projection_type:  2
-  flat_voxel_size:      0.005
-  spherical_voxel_size: 0.005
+  max_lens_angle:   207
+  projection_type:  1
+  flat_voxel_size:      0.0025
+  spherical_voxel_size: 0.001
+  camera_frame_front:   camera_front
+  camera_frame_rear:    camera_rear
+  target_frame:         target_frame

@@ -19,12 +19,23 @@
   	> 
 	</node>
 
+
+	<!-- Static Transform Publishers !-->
 	<node
-		name    = "map_maker_pcs"
-      	pkg     = "pointcloud_processing_server"
-      	type    = "map_maker_pcs"
-      	output  = "screen"
-  	> 
-	</node>
+		name    = "map_publisher"   pkg = "tf"   type = "static_transform_publisher"
+      	args  	= "0 0 0 0 0 0 		/world 	/map 	100"
+  	> </node>
+	<node
+		name    = "front_cam_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
+      	args  	= "0 0 0 0 0 0 		/map  /target_frame 	100"
+  	> </node>
+	<node
+		name    = "rear_cam_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
+      	args  	= "-0.015 0 0 0 1.57 0  	/map  /camera_front 	100"
+  	> </node>
+	<node
+		name    = "target_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
+      	args  	= "0.015 0 0 0 1.57 0  /map  /camera_rear 		100"
+  	> </node>
 
 </launch>

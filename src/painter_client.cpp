@@ -30,6 +30,11 @@ int main(int argc, char** argv)
 	nh.param<float>("/pointcloud_painter/flat_voxel_size", flat_voxel_size, 0.005);
 	nh.param<float>("/pointcloud_painter/spherical_voxel_size", spherical_voxel_size, 0.005);
 
+	std::string camera_frame_front, camera_frame_rear, target_frame;
+	nh.param<std::string>("/pointcloud_painter/camera_frame_front", camera_frame_front, "camera_front");
+	nh.param<std::string>("/pointcloud_painter/camera_frame_rear", camera_frame_rear, "camera_rear");
+	nh.param<std::string>("/pointcloud_painter/target_frame", target_frame, "target_frame");
+
 	// ---------------------------------------------------------------------------
 	// ------------------------ Extract Data from ROSBAGs ------------------------
 	// ---------------------------------------------------------------------------
@@ -105,13 +110,22 @@ int main(int argc, char** argv)
 
 	// Set up service object
 	pointcloud_painter::pointcloud_painter_srv srv;
+	// Data
 	srv.request.input_cloud = pointcloud;
 	srv.request.image_front = front_image;
 	srv.request.image_rear = rear_image;
+	// Projection Stuff
 	srv.request.projection = projection_type;
 	srv.request.max_angle = max_lens_angle;
+	// Voxelization
 	srv.request.flat_voxel_size = flat_voxel_size;
 	srv.request.spherical_voxel_size = spherical_voxel_size;
+	// Frames
+	srv.request.camera_frame_front = camera_frame_front;
+	srv.request.camera_frame_rear = camera_frame_rear;
+	srv.request.target_frame = target_frame;
+
+	ROS_ERROR_STREAM("first: " << front_image.header.frame_id << " " << rear_image.header.frame_id);
 
 	// Run Service
 	while(ros::ok())
