@@ -31,8 +31,8 @@ int main(int argc, char** argv)
 	nh.param<float>("/pointcloud_painter/spherical_voxel_size", spherical_voxel_size, 0.005);
 
 	std::string camera_frame_front, camera_frame_rear, target_frame;
-	nh.param<std::string>("/pointcloud_painter/camera_frame_front", camera_frame_front, "camera_front");
-	nh.param<std::string>("/pointcloud_painter/camera_frame_rear", camera_frame_rear, "camera_rear");
+	nh.param<std::string>("/pointcloud_painter/camera_frame_front", camera_frame_front, "front_camera_frame");
+	nh.param<std::string>("/pointcloud_painter/camera_frame_rear", camera_frame_rear, "rear_camera_frame");
 	nh.param<std::string>("/pointcloud_painter/target_frame", target_frame, "target_frame");
 
 	// ---------------------------------------------------------------------------
@@ -112,6 +112,7 @@ int main(int argc, char** argv)
 	pointcloud_painter::pointcloud_painter_srv srv;
 	// Data
 	srv.request.input_cloud = pointcloud;
+	srv.request.input_cloud.header.stamp = ros::Time::now();
 	srv.request.image_front = front_image;
 	srv.request.image_rear = rear_image;
 	// Projection Stuff
@@ -126,6 +127,8 @@ int main(int argc, char** argv)
 	srv.request.target_frame = target_frame;
 
 	ROS_ERROR_STREAM("first: " << front_image.header.frame_id << " " << rear_image.header.frame_id);
+
+	ros::Duration(1.0).sleep();
 
 	// Run Service
 	while(ros::ok())

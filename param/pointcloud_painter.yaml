@@ -5,7 +5,7 @@ pointcloud_painter:
   max_lens_angle:   207
   projection_type:  1
   flat_voxel_size:      0.0025
-  spherical_voxel_size: 0.001
-  camera_frame_front:   camera_front
-  camera_frame_rear:    camera_rear
+  spherical_voxel_size: 0.002
+  camera_frame_front:   front_camera_frame
+  camera_frame_rear:    rear_camera_frame
   target_frame:         target_frame
