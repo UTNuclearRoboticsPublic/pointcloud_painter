@@ -6,13 +6,8 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /Input Depth1/Status1
-        - /Projected Depth1/Status1
-        - /Spherical PCL Image1
         - /Spherical PCL Image1/Status1
-        - /Final Cloud1
         - /Final Cloud1/Status1
-        - /TF1
         - /TF1/Frames1
       Splitter Ratio: 0.650872827
     Tree Height: 821
@@ -316,25 +311,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.99951267
+      Distance: 10.6563215
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.0982855111
-        Y: -0.15228489
-        Z: 0.610201418
+        X: 1.47343504
+        Y: 1.00189495
+        Z: 1.21654809
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.245203525
+      Pitch: 0.560203493
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.84134531
+      Yaw: 4.28817225
     Saved: ~
 Window Geometry:
   Displays:

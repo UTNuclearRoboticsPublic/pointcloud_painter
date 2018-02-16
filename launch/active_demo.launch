@@ -14,16 +14,12 @@
 	<node
 		name    = "painter_client"
       	pkg     = "pointcloud_painter"
-      	type    = "painter_client"
+      	type    = "active_painter_demo"
       	output  = "screen"
   	> 
 	</node>
 
 	<!-- Static Transform Publishers !-->
-	<node
-		name    = "map_publisher"   pkg = "tf"   type = "static_transform_publisher"
-      	args  	= "0 0 0 0 0 0 		/world 	/map 	100"
-  	> </node>
 	<node
 		name    = "front_cam_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
       	args  	= "-0.295 0.01 1.02 0 1.57 3.14159 		/map  /target_frame 	100"

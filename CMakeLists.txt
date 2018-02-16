@@ -144,6 +144,14 @@ target_link_libraries(
   painter_client ${catkin_LIBRARIES}
 )
 
+add_executable(active_painter_demo src/active_painter_demo.cpp)
+add_dependencies(
+   active_painter_demo ${pointcloud_painter_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}
+)
+target_link_libraries(
+  active_painter_demo ${catkin_LIBRARIES}
+)
+
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use

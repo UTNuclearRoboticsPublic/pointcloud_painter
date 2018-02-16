@@ -1,6 +1,36 @@
 
 #include <ros/ros.h>
 #include "pointcloud_painter/pointcloud_painter.h"
+#include <ros/callback_queue.h>
+
+bool found_pointcloud, found_front_image, found_rear_image;
+sensor_msgs::Image front_image, rear_image;
+sensor_msgs::PointCloud2 pointcloud;
+
+void pointcloud_callback(const sensor_msgs::PointCloud2::ConstPtr& input_cloud)
+{
+	if(!found_pointcloud)
+	{
+		pointcloud = *input_cloud;
+		found_pointcloud = true;
+	}
+}
+void front_image_callback(const sensor_msgs::Image::ConstPtr& input_image)
+{
+	if(!found_front_image)
+	{
+		front_image = *input_image;
+		found_front_image = true;
+	}
+}
+void rear_image_callback(const sensor_msgs::Image::ConstPtr& input_image)
+{
+	if(!found_rear_image)
+	{
+		rear_image = *input_image;
+		found_rear_image = true;
+	}
+}
 
 int main(int argc, char** argv)
 {
@@ -8,7 +38,7 @@ int main(int argc, char** argv)
 	// ----------------------------- Basic ROS Stuff -----------------------------
 	// ---------------------------------------------------------------------------
 
-	ros::init(argc, argv, "painter_client");
+	ros::init(argc, argv, "active_painter_demo");
 
 	ros::NodeHandle nh;
 
@@ -53,74 +83,40 @@ int main(int argc, char** argv)
 	// ------------------------ Extract Data from ROSBAGs ------------------------
 	// ---------------------------------------------------------------------------
 
-	// ------------- Bag Names and Topics -------------
-	std::string cloud_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/local_dense_cloud.bag";
-	std::string front_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/front_view_image_360.bag";
-	std::string rear_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/rear_view_image_360.bag";
-	std::string cloud_bag_topic = 	"/laser_stitcher/local_dense_cloud";
-	std::string front_bag_topic = 	"front_camera/image_raw";
-	std::string rear_bag_topic = 	"rear_camera/image_raw";
-	ROS_INFO_STREAM("[PointcloudPainter] Loading data from bag files.");
+	// Input data topics
+	std::string pointcloud_topic = 		"/laser_stitcher/local_dense_cloud";
+	std::string front_image_topic = 	"front_camera/image_raw";
+	std::string rear_image_topic = 		"rear_camera/image_raw";
 
-	// ------------- First Bag - CLOUD -------------
-	sensor_msgs::PointCloud2 pointcloud;
-	rosbag::Bag cloud_bag; 
-	cloud_bag.open(cloud_bag_name, rosbag::bagmode::Read);
+	found_pointcloud = false;
+	found_front_image = false;
+	found_rear_image = false;
 
-	std::vector<std::string> topics;
-	topics.push_back(cloud_bag_topic);
-	rosbag::View view_cloud(cloud_bag, rosbag::TopicQuery(topics));
+	ros::NodeHandle sub_handle;
+	ros::CallbackQueue input_callback_queue;
+	sub_handle.setCallbackQueue(&input_callback_queue);
 
-	BOOST_FOREACH(rosbag::MessageInstance const m, view_cloud)
-    {
-        sensor_msgs::PointCloud2::ConstPtr cloud_ptr = m.instantiate<sensor_msgs::PointCloud2>();
-        if (cloud_ptr != NULL)
-            pointcloud = *cloud_ptr;
-        else
-        	ROS_ERROR_STREAM("[PointcloudPainter] Cloud retrieved from bag is null...");
-    }
-    cloud_bag.close(); 
-
-    // ------------- Second Bag - FRONT IMAGE -------------
-    sensor_msgs::Image front_image;
-	rosbag::Bag front_bag; 
-	front_bag.open(front_bag_name, rosbag::bagmode::Read);
-
-	std::vector<std::string> front_topics;
-	front_topics.push_back(front_bag_topic);
-	rosbag::View view_front(front_bag, rosbag::TopicQuery(front_topics));
-
-	BOOST_FOREACH(rosbag::MessageInstance const m, view_front)
-    {
-        sensor_msgs::Image::ConstPtr front_ptr = m.instantiate<sensor_msgs::Image>();
-        if (front_ptr != NULL)
-            front_image = *front_ptr;
-        else
-        	ROS_ERROR_STREAM("[PointcloudPainter] Front image retrieved from bag is null...");
-    }
-    front_bag.close();
-
-    // ------------- Third Bag - REAR IMAGE -------------
-    sensor_msgs::Image rear_image;
-	rosbag::Bag rear_bag; 
-	rear_bag.open(rear_bag_name, rosbag::bagmode::Read);
-
-	std::vector<std::string> rear_topics;
-	rear_topics.push_back(rear_bag_topic);
-	rosbag::View view_rear(rear_bag, rosbag::TopicQuery(rear_topics));
-
-	BOOST_FOREACH(rosbag::MessageInstance const m, view_rear)
-    {
-    	ROS_INFO_STREAM("opening this bit..." );
-        sensor_msgs::Image::ConstPtr rear_ptr = m.instantiate<sensor_msgs::Image>();
-        if (rear_ptr != NULL)
-            rear_image = *rear_ptr;
-        else
-        	ROS_ERROR_STREAM("[PointcloudPainter] Front image retrieved from bag is null...");
-    }
-    rear_bag.close();
-
-    ROS_INFO_STREAM("fkjljwe " << rear_image.height << " " << rear_image.width);
+	ros::Subscriber pointcloud_sub = sub_handle.subscribe<sensor_msgs::PointCloud2>(pointcloud_topic, 1, pointcloud_callback);
+	while(ros::ok() && !found_pointcloud)
+	{
+		input_callback_queue.callAvailable(ros::WallDuration());
+		ros::Duration(0.1).sleep();
+		ROS_INFO_STREAM("waiting for pointcloud input message...");
+	}
+	ros::Subscriber front_image_sub = sub_handle.subscribe<sensor_msgs::Image>(front_image_topic, 1, front_image_callback);
+	while(ros::ok() && !found_front_image)
+	{
+		input_callback_queue.callAvailable(ros::WallDuration());
+		ros::Duration(0.1).sleep();
+		ROS_INFO_STREAM("waiting for front image input message...");
+	}
+	ros::Subscriber rear_image_sub = sub_handle.subscribe<sensor_msgs::Image>(rear_image_topic, 1, rear_image_callback);
+	while(ros::ok() && !found_rear_image)
+	{
+		input_callback_queue.callAvailable(ros::WallDuration());
+		ros::Duration(0.1).sleep();
+		ROS_INFO_STREAM("waiting for rear image input message...");
+	}
 
 	// -------- Set up service object --------
 	pointcloud_painter::pointcloud_painter_srv srv;

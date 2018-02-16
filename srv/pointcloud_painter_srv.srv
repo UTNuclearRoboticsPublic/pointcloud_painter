@@ -14,12 +14,23 @@ int32 projection
 # Maximum FOV angle used by lens (degrees):
 float32 max_angle
 
-# ---------------- Processing ----------------
+# ---------------- Compression ----------------
+# ------ Raster-space Compression (simple) ------
+bool compress_image
+int32 image_compression_ratio
+# ------ Pointcloud-space Voxelization ------
+bool voxelize_rgb_images
 float32 flat_voxel_size
 float32 spherical_voxel_size
+bool voxelize_depth_cloud
+float32 depth_voxel_size
+
+# ---------------- Processing ----------------
+int32 neighbor_search_count
 string camera_frame_front
 string camera_frame_rear
 string target_frame
+
 
 ---
 

@@ -31,8 +31,9 @@ public:
 	PointcloudPainter();
 	bool build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_flat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_spherical_lobed, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_spherical, cv_bridge::CvImagePtr cv_image, std::string camera_frame, std::string target_frame, int projection, float max_angle, int image_hgt, int image_wdt, bool flip_cloud);
 	bool paint_pointcloud(pointcloud_painter::pointcloud_painter_srv::Request &req, pointcloud_painter::pointcloud_painter_srv::Response &res);
-	bool neighbor_color_search(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud, pcl::PointCloud<pcl::PointXYZ> spherical_depth_cloud, pcl::PointCloud<pcl::PointXYZ> depth_cloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &rgb_cloud, int ver_res, int hor_res, int k);
+	bool neighbor_color_search(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud, pcl::PointCloud<pcl::PointXYZ> spherical_depth_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &depth_cloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &rgb_cloud, int ver_res, int hor_res, int k);
 	bool interpolate_colors(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud, pcl::PointCloud<pcl::PointXYZ> &depth_cloud, pcl::PointCloud<pcl::PointXYZRGB> &rgb_cloud, int ver_res, int hor_res);
+	bool downsample_image(cv_bridge::CvImagePtr image_out, cv_bridge::CvImagePtr image_in, int height, int width, int height_mult, int width_mult);
 
 private:
 	ros::NodeHandle nh_;
