@@ -58,7 +58,7 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	ROS_INFO_STREAM("transformed input cloud " << time_elapsed);
 
 	// ------ Create PCL Pointclouds ------
-	pcl::PointCloud<pcl::PointXYZ>::Ptr input_depth_pcl(new pcl::PointCloud<pcl::PointXYZ>());
+	pcl::PointCloud<pcl::PointXYZI>::Ptr input_depth_pcl(new pcl::PointCloud<pcl::PointXYZI>());
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr output_pcl(new pcl::PointCloud<pcl::PointXYZRGB>());
 	pcl::fromROSMsg(transformed_depth_cloud, *input_depth_pcl); 	// Initialize input cloud 
 	ROS_INFO_STREAM("Transformed: " << transformed_depth_cloud.height << " " << transformed_depth_cloud.width << " " << input_depth_pcl->points.size());
@@ -68,11 +68,11 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	// Voxelize Input Depth Cloud
 	if(req.voxelize_depth_cloud)
 	{
-		pcl::VoxelGrid<pcl::PointXYZ> vg_xyz;
+		pcl::VoxelGrid<pcl::PointXYZI> vg_xyz;
 		vg_xyz.setInputCloud(input_depth_pcl);
 		vg_xyz.setLeafSize(req.depth_voxel_size, req.depth_voxel_size, req.depth_voxel_size);
 		// Apply Filter and return Voxelized Data
-		pcl::PointCloud<pcl::PointXYZ>::Ptr temp_depth_pcp = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
+		pcl::PointCloud<pcl::PointXYZI>::Ptr temp_depth_pcp = pcl::PointCloud<pcl::PointXYZI>::Ptr(new pcl::PointCloud<pcl::PointXYZI>());
 		vg_xyz.filter(*temp_depth_pcp);
 		*input_depth_pcl = *temp_depth_pcp;
 		time_elapsed = ros::Time::now() - start_time;
@@ -80,6 +80,7 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	}
 	// Input Cloud - projected onto a sphere of fixed radius
 	pcl::PointCloud<pcl::PointXYZ> input_pcl_projected = pcl::PointCloud<pcl::PointXYZ>(); 
+	pcl::PointCloud<pcl::PointXYZI> input_pcl_projected_intensity = pcl::PointCloud<pcl::PointXYZI>(); 
 	// Actually perform projection: 
 	for(int i=0; i<input_depth_pcl->points.size(); i++)
 	{
@@ -89,6 +90,13 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 		point.y = input_depth_pcl->points[i].y / distance;
 		point.z = input_depth_pcl->points[i].z / distance;
 		input_pcl_projected.points.push_back(point);
+
+		pcl::PointXYZI point_i;
+		point_i.x = point.x;
+		point_i.y = point.y;
+		point_i.z = point.z; 
+		point_i.intensity = input_depth_pcl->points[i].intensity;
+		input_pcl_projected_intensity.points.push_back(point_i);
 	}
 
 	time_elapsed = ros::Time::now() - start_time;
@@ -212,14 +220,11 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	ros::Publisher pub_final = nh_.advertise<sensor_msgs::PointCloud2>("final_cloud", 1, this);
 	pub_final.publish(final_cloud);
 
-	sensor_msgs::PointCloud2 input_depth_cloud;
-	pcl::toROSMsg(*input_depth_pcl, input_depth_cloud);
-	input_depth_cloud.header.frame_id = req.input_cloud.header.frame_id;
 	ros::Publisher pub_input_depth = nh_.advertise<sensor_msgs::PointCloud2>("input_depth_cloud", 1, this);
-	pub_input_depth.publish(input_depth_cloud);
+	pub_input_depth.publish(req.input_cloud);
 
 	sensor_msgs::PointCloud2 input_depth_projected;
-	pcl::toROSMsg(input_pcl_projected, input_depth_projected);
+	pcl::toROSMsg(input_pcl_projected_intensity, input_depth_projected);
 	input_depth_projected.header.frame_id = req.target_frame;
 	ros::Publisher pub_depth_projected = nh_.advertise<sensor_msgs::PointCloud2>("input_depth_projected", 1, this);
 	pub_depth_projected.publish(input_depth_projected);
@@ -462,7 +467,7 @@ bool PointcloudPainter::interpolate_colors(pcl::PointCloud<pcl::PointXYZRGB>::Pt
 // K Nearest Neighbor search for color determination 
 // might be easiest to operate on image if I convert it to openCV format
 // BUT probably a lot more useful if I can avoid that because openCV is a pain to compile etc...
-bool PointcloudPainter::neighbor_color_search(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud, pcl::PointCloud<pcl::PointXYZ> spherical_depth_cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &depth_cloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &rgb_cloud, int ver_res, int hor_res, int k)
+bool PointcloudPainter::neighbor_color_search(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &output_cloud, pcl::PointCloud<pcl::PointXYZ> spherical_depth_cloud, pcl::PointCloud<pcl::PointXYZI>::Ptr &depth_cloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &rgb_cloud, int ver_res, int hor_res, int k)
 {
 	ROS_ERROR_STREAM("neighbor_count " << k << " depth size: " << spherical_depth_cloud.points.size() << " " << depth_cloud->points.size());
 	pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
