@@ -1,8 +1,8 @@
 
 # ---------------- Data ----------------
 sensor_msgs/PointCloud2 input_cloud
-sensor_msgs/Image image_front
-sensor_msgs/Image image_rear
+sensor_msgs/Image[] image_list
+string[] image_names
 
 # ---------------- Camera Lens Properties ----------------
 # NOTE - most image properties (height/width/frame/etc) given in image message 
@@ -10,14 +10,15 @@ sensor_msgs/Image image_rear
 #   1 -> EQUATORIAL STEROGRAPHIC 		 (Equidistant / Equal-angle / Stereographic Projection)
 #   2 -> POLE-TANGENT STEREOGRAPHIC 	 (Equidistant / Equal-angle / Stereographic Projection)
 #   3 -> LAMBERT ZENITHAL EQUAL AREA   	 (Equisolid   / Equal-area  / Lambert Azimuthal / Lambert Zenithal)
-int32 projection
+#   4 -> RECTANGULAR
+int32[] projections
 # Maximum FOV angle used by lens (degrees):
-float32 max_angle
+float32[] max_image_angles
 
 # ---------------- Compression ----------------
 # ------ Raster-space Compression (simple) ------
-bool compress_image
-int32 image_compression_ratio
+bool[] compress_images
+int32[] image_compression_ratios
 # ------ Pointcloud-space Voxelization ------
 bool voxelize_rgb_images
 float32 flat_voxel_size
@@ -27,11 +28,21 @@ float32 depth_voxel_size
 
 # ---------------- Processing ----------------
 int32 neighbor_search_count
-string camera_frame_front
-string camera_frame_rear
+string[] camera_frames
 string target_frame
 
 
+# -----------------------------------------------------------------------------------------------------------------------------
 ---
+# -----------------------------------------------------------------------------------------------------------------------------
 
+
+# ---------------- Output Cloud ----------------
 sensor_msgs/PointCloud2 output_cloud
+
+# ---------------- Performance ----------------
+float32 depth_preprocessing_time
+float32[] image_preprocessing_times
+float32 image_voxelizing_time
+float32 painting_time
+float32 total_time

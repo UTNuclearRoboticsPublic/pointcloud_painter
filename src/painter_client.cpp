@@ -21,7 +21,7 @@ int main(int argc, char** argv)
 	nh.param<float>("/pointcloud_painter/max_lens_angle", max_lens_angle, 235);
 	// Type of projection (see pointcloud_painter/pointcloud_painter_srv)
 	int projection_type;
-	nh.param<int>("/pointcloud_painter/projection_type", projection_type, 2);
+	nh.param<int>("/pointcloud_painter/projection_type", projection_type, PAINTER_PROJ_EQUA_STEREO);
 	int neighbor_search_count;
 	nh.param<int>("/pointcloud_painter/neighbor_search_count", neighbor_search_count, 3);
 	// Should this process loop? 
@@ -54,11 +54,13 @@ int main(int argc, char** argv)
 	// ---------------------------------------------------------------------------
 
 	// ------------- Bag Names and Topics -------------
-	std::string cloud_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/local_dense_cloud.bag";
-	std::string front_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/front_view_image_360.bag";
+	std::string cloud_bag_name = "/home/conor/catkin-ws/data/Painting/local_dense_cloud.bag";
+	//std::string cloud_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/local_dense_cloud.bag";
+	std::string front_bag_name = 	"/home/conor/catkin-ws/data/Painting/2018-03-15-16-11-12.bag";
+	//std::string front_bag_name = 	"/home/conor/catkin-ws/data/Painting/front_view_image_360.bag";
 	std::string rear_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/rear_view_image_360.bag";
 	std::string cloud_bag_topic = 	"/laser_stitcher/local_dense_cloud";
-	std::string front_bag_topic = 	"front_camera/image_raw";
+	std::string front_bag_topic = 	"/camera_ee/rgb/image_raw";
 	std::string rear_bag_topic = 	"rear_camera/image_raw";
 	ROS_INFO_STREAM("[PointcloudPainter] Loading data from bag files.");
 
@@ -127,16 +129,22 @@ int main(int argc, char** argv)
 	// -------- Data --------
 	srv.request.input_cloud = pointcloud;
 	srv.request.input_cloud.header.stamp = ros::Time::now();
-	srv.request.image_front = front_image;
-	srv.request.image_rear = rear_image;
+	srv.request.image_list.push_back(front_image);
+	srv.request.image_list.push_back(rear_image);
+	srv.request.image_names.push_back("front_image");
+	srv.request.image_names.push_back("rear_image");
 	// -------- Projection Stuff --------
-	srv.request.projection = projection_type;
-	srv.request.max_angle = max_lens_angle;
+	srv.request.projections.push_back(projection_type);
+	srv.request.projections.push_back(1);
+	srv.request.max_image_angles.push_back(max_lens_angle);
+	srv.request.max_image_angles.push_back(260);
 	srv.request.neighbor_search_count = neighbor_search_count;
 	// -------- Compression --------
 	// Raster-space Compression
-	srv.request.compress_image = compress_image;
-	srv.request.image_compression_ratio = image_compression_ratio;
+	srv.request.compress_images.push_back(compress_image);
+	srv.request.compress_images.push_back(compress_image);
+	srv.request.image_compression_ratios.push_back(image_compression_ratio);
+	srv.request.image_compression_ratios.push_back(image_compression_ratio);
 	// Pointcloud-space Compression
 	srv.request.voxelize_rgb_images = voxelize_rgb_images;
 	srv.request.flat_voxel_size = flat_voxel_size;
@@ -144,8 +152,8 @@ int main(int argc, char** argv)
 	srv.request.voxelize_depth_cloud = voxelize_depth_cloud;
 	srv.request.depth_voxel_size = depth_voxel_size;
 	// -------- Frames --------
-	srv.request.camera_frame_front = camera_frame_front;
-	srv.request.camera_frame_rear = camera_frame_rear;
+	srv.request.camera_frames.push_back(camera_frame_front);
+	srv.request.camera_frames.push_back(camera_frame_rear);
 	srv.request.target_frame = target_frame;
 
 	ROS_ERROR_STREAM("first: " << front_image.header.frame_id << " " << rear_image.header.frame_id);

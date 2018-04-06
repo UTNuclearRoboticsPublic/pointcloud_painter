@@ -22,50 +22,47 @@ PointcloudPainter::PointcloudPainter()
 */
 bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_srv::Request &req, pointcloud_painter::pointcloud_painter_srv::Response &res)
 {
+
 	ROS_INFO_STREAM("[PointcloudPainter] Received call to paint pointcloud!");
 	ROS_INFO_STREAM("[PointcloudPainter]   Input cloud size: " << req.input_cloud.height*req.input_cloud.width);
-	ROS_INFO_STREAM("[PointcloudPainter]   Front image size: " << req.image_front.height << " by " << req.image_front.width);
-	ROS_INFO_STREAM("[PointcloudPainter]   Rear image size: " << req.image_rear.height << " by " << req.image_rear.width);
-
+	for(int i=0; i<req.image_list.size(); i++)
+	{
+		ROS_INFO_STREAM("[PointcloudPainter]   " << req.image_names[i] << " image size: " << req.image_list[i].height << " by " << req.image_list[i].width);
+	}
+	
 	ros::Time start_time = ros::Time::now();
 	ros::Duration time_elapsed;
 
-	// Image Angular Resolution
-	float hor_res; 	// horizontal
-	float ver_res;  // vertical
 
-	//tf2::Transform transform_to_image;
 
-	std::string image_frame = req.target_frame;
-
+	// ----------------------------------------------------------------------------------
+	// ------------------------------- SET UP DEPTH CLOUD -------------------------------
+	// ----------------------------------------------------------------------------------
+	
 	// ------ Transform input_cloud to camera_frame ------
 	std::string cloud_frame = req.input_cloud.header.frame_id;
 	sensor_msgs::PointCloud2 transformed_depth_cloud;
-	if(camera_frame_listener_.waitForTransform(cloud_frame, image_frame, ros::Time(0), ros::Duration(0.5)))  
+	if(camera_frame_listener_.waitForTransform(cloud_frame, req.target_frame, ros::Time(0), ros::Duration(0.5)))  
 	{
 		tf::StampedTransform transform;
-		camera_frame_listener_.lookupTransform(image_frame, cloud_frame, ros::Time(0), transform);
-		pcl_ros::transformPointCloud(image_frame, transform, req.input_cloud, transformed_depth_cloud);
-		//pcl_ros::transformPointCloud (image_frame, req.input_cloud, transformed_depth_cloud, camera_frame_listener_);  	// transforms input_pc2 into process_message
+		camera_frame_listener_.lookupTransform(req.target_frame, cloud_frame, ros::Time(0), transform);
+		pcl_ros::transformPointCloud(req.target_frame, transform, req.input_cloud, transformed_depth_cloud);
 	}
 	else 
 	{  													// if Transform request times out... Continues WITHOUT TRANSFORM
-		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Defaulting to initial location of input cloud...", cloud_frame.c_str(), image_frame.c_str());
+		ROS_WARN_THROTTLE(60, "[PointcloudPainter] listen for transformation from %s to %s timed out. Defaulting to initial location of input cloud...", cloud_frame.c_str(), req.target_frame.c_str());
 		transformed_depth_cloud = req.input_cloud;
 	}
-
 	time_elapsed = ros::Time::now() - start_time;
-	ROS_INFO_STREAM("transformed input cloud " << time_elapsed);
+	ROS_DEBUG_STREAM("transformed input cloud " << time_elapsed);
 
 	// ------ Create PCL Pointclouds ------
 	pcl::PointCloud<pcl::PointXYZI>::Ptr input_depth_pcl(new pcl::PointCloud<pcl::PointXYZI>());
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr output_pcl(new pcl::PointCloud<pcl::PointXYZRGB>());
 	pcl::fromROSMsg(transformed_depth_cloud, *input_depth_pcl); 	// Initialize input cloud 
-	ROS_INFO_STREAM("Transformed: " << transformed_depth_cloud.height << " " << transformed_depth_cloud.width << " " << input_depth_pcl->points.size());
-
-	// ------ Create PCL Pointclouds for Second Method ------
-	//   These only matter for the K Nearest Neighbors approach (not for interpolation)
-	// Voxelize Input Depth Cloud
+	ROS_DEBUG_STREAM("Transformed: " << transformed_depth_cloud.height << " " << transformed_depth_cloud.width << " " << input_depth_pcl->points.size());
+	
+	// ------ Voxelize Input Depth Cloud ------
 	if(req.voxelize_depth_cloud)
 	{
 		pcl::VoxelGrid<pcl::PointXYZI> vg_xyz;
@@ -76,8 +73,12 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 		vg_xyz.filter(*temp_depth_pcp);
 		*input_depth_pcl = *temp_depth_pcp;
 		time_elapsed = ros::Time::now() - start_time;
-		ROS_INFO_STREAM("voxelized input depth cloud " << time_elapsed << "... new size: " << input_depth_pcl->points.size());
+		ROS_DEBUG_STREAM("voxelized input depth cloud " << time_elapsed << "... new size: " << input_depth_pcl->points.size());
 	}
+
+	// ------ Create Spherical PCL "Depth" Clouds for Second Method ------
+	//   These only matter for the K Nearest Neighbors approach (not for interpolation)
+	//   Although the interpolation methods aren't really implemented yet... not sure if I WILL implement them, we'll see
 	// Input Cloud - projected onto a sphere of fixed radius
 	pcl::PointCloud<pcl::PointXYZ> input_pcl_projected = pcl::PointCloud<pcl::PointXYZ>(); 
 	pcl::PointCloud<pcl::PointXYZI> input_pcl_projected_intensity = pcl::PointCloud<pcl::PointXYZI>(); 
@@ -98,97 +99,98 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 		point_i.intensity = input_depth_pcl->points[i].intensity;
 		input_pcl_projected_intensity.points.push_back(point_i);
 	}
-
 	time_elapsed = ros::Time::now() - start_time;
-	ROS_INFO_STREAM("projected depth cloud to sphere " << time_elapsed);
+	ROS_DEBUG_STREAM("projected depth cloud to sphere " << time_elapsed);
+	res.depth_preprocessing_time = time_elapsed.toSec();
 
-	// Build cloud from Input Image - XYZRGB cloud fixed on a flat raster plane
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr flat_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>); 
-	// Build cloud from Input Image - XYZRGB cloud projected back onto life-like sphere of radius given by PROJECTION_RADIUS above 
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr spherical_image_lobed_pcl = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>);
-	// Build cloud from Input Image - XYZRGB cloud projected finally from two separate spherical clouds (slightly offset in center position) to a single spherical cloud around target_frame 
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr spherical_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>);
 
-	cv_bridge::CvImagePtr cv_ptr_front; 
-	try
-	{
-		cv_ptr_front = cv_bridge::toCvCopy(req.image_front, sensor_msgs::image_encodings::BGR8);
-	}
-	catch(cv_bridge::Exception& e)
-	{
-		ROS_ERROR_STREAM("[PointcloudPainter] cv_bridge exception: " << e.what());
-		return false; 
-	}
-	cv_bridge::CvImagePtr cv_ptr_rear; 
-	try
-	{
-		cv_ptr_rear = cv_bridge::toCvCopy(req.image_rear, sensor_msgs::image_encodings::BGR8);
-	}
-	catch(cv_bridge::Exception& e)
-	{
-		ROS_ERROR_STREAM("[PointcloudPainter] cv_bridge exception: " << e.what());
-		return false; 
-	}
 
-	time_elapsed = ros::Time::now() - start_time;
-	ROS_INFO_STREAM("converted ros images to CV objects " << time_elapsed);
-
-	cv_bridge::CvImagePtr resized_front_image(new cv_bridge::CvImage);
-	cv_bridge::CvImagePtr resized_rear_image(new cv_bridge::CvImage);
-	if(req.compress_image)
-	{
-		downsample_image(resized_front_image, cv_ptr_front, req.image_front.height/req.image_compression_ratio, req.image_front.width/req.image_compression_ratio, req.image_compression_ratio, req.image_compression_ratio);
-		downsample_image(resized_rear_image, cv_ptr_rear, req.image_rear.height/req.image_compression_ratio, req.image_rear.width/req.image_compression_ratio, req.image_compression_ratio, req.image_compression_ratio);
-
-		time_elapsed = ros::Time::now() - start_time;
-		ROS_INFO_STREAM("resized CV objects " << time_elapsed);
-		build_image_clouds(flat_image_pcl, spherical_image_lobed_pcl, spherical_image_pcl, resized_front_image, req.camera_frame_front, req.target_frame, req.projection, req.max_angle, req.image_front.height/req.image_compression_ratio, req.image_front.width/req.image_compression_ratio, false);
-		build_image_clouds(flat_image_pcl, spherical_image_lobed_pcl, spherical_image_pcl, resized_rear_image, req.camera_frame_rear, req.target_frame, req.projection, req.max_angle, req.image_rear.height/req.image_compression_ratio, req.image_rear.width/req.image_compression_ratio, true);
-	}
-	else
-	{	
-		time_elapsed = ros::Time::now() - start_time;
-		ROS_INFO_STREAM("resized CV objects " << time_elapsed);
-		build_image_clouds(flat_image_pcl, spherical_image_lobed_pcl, spherical_image_pcl, cv_ptr_front, req.camera_frame_front, req.target_frame, req.projection, req.max_angle, req.image_front.height, req.image_front.width, false);
-		build_image_clouds(flat_image_pcl, spherical_image_lobed_pcl, spherical_image_pcl, cv_ptr_rear, req.camera_frame_rear, req.target_frame, req.projection, req.max_angle, req.image_rear.height, req.image_rear.width, true);
-	}
-
-	time_elapsed = ros::Time::now() - start_time;
-	ROS_INFO_STREAM("created image clouds " << time_elapsed);
-
-	ROS_ERROR_STREAM("size: " << spherical_image_pcl->points.size() << " example: " << spherical_image_pcl->points[0].x << " " << spherical_image_pcl->points[0].y << " " << spherical_image_pcl->points[0].z);
-	pcl::VoxelGrid<pcl::PointXYZRGB> vg;
-	vg.setInputCloud(flat_image_pcl);
-	vg.setLeafSize(req.flat_voxel_size, req.flat_voxel_size, req.flat_voxel_size);
-	// Apply Filter and return Voxelized Data
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_pcp = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
-	vg.filter(*temp_pcp);
-	*flat_image_pcl = *temp_pcp;
-
-	time_elapsed = ros::Time::now() - start_time;
-	ROS_INFO_STREAM("voxelized flat image cloud " << time_elapsed);
-
-	vg.setInputCloud(spherical_image_lobed_pcl);
-	vg.setLeafSize(req.spherical_voxel_size, req.spherical_voxel_size, req.spherical_voxel_size);
-	// Apply Filter and return Voxelized Data
-	temp_pcp->points.clear();
-	vg.filter(*temp_pcp);
-	*spherical_image_lobed_pcl = *temp_pcp;
-
-	time_elapsed = ros::Time::now() - start_time;
-	ROS_INFO_STREAM("voxelized spherical lobed image cloud " << time_elapsed);
-
-	vg.setInputCloud(spherical_image_pcl);
-	vg.setLeafSize(req.spherical_voxel_size, req.spherical_voxel_size, req.spherical_voxel_size);
-	// Apply Filter and return Voxelized Data
-	temp_pcp->points.clear();
-	vg.filter(*temp_pcp);
-	*spherical_image_pcl = *temp_pcp;
+	// ----------------------------------------------------------------------------------
+	// -------------------------------- SET UP RGB CLOUDS -------------------------------
+	// ----------------------------------------------------------------------------------
 	
-	time_elapsed = ros::Time::now() - start_time;
-	ROS_INFO_STREAM("voxelized spherical image cloud " << time_elapsed);
+	// ------ Set Up PCL Objects ------
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr flat_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>); 
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr spherical_image_lobed_pcl = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>);
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr spherical_image_pcl = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>);
+	// ------ Extract Data ------
+	for(int i=0; i<req.image_list.size(); i++)
+	{
+		// ------ Set up CV Object ------
+		cv_bridge::CvImagePtr image_ptr; 
+		try
+		{
+			image_ptr = cv_bridge::toCvCopy(req.image_list[i], sensor_msgs::image_encodings::BGR8);
+		}
+		catch(cv_bridge::Exception& e)
+		{
+			ROS_ERROR_STREAM("[PointcloudPainter] cv_bridge exception: " << e.what());
+			return false; 
+		}
+		time_elapsed = ros::Time::now() - start_time;
+		ROS_DEBUG_STREAM("converted ros image of name " << req.image_names[i] << " to CV objects " << time_elapsed);
 
-	ROS_ERROR_STREAM("size: " << spherical_image_pcl->points.size() << " example: " << spherical_image_pcl->points[0].x << " " << spherical_image_pcl->points[0].y << " " << spherical_image_pcl->points[0].z);
+		// ------ Transform, Populate Spherical Cloud ------
+		cv_bridge::CvImagePtr resized_image_ptr(new cv_bridge::CvImage);
+		if(req.compress_images[i])
+		{
+			downsample_image(resized_image_ptr, image_ptr, req.image_list[i].height/req.image_compression_ratios[i], req.image_list[i].width/req.image_compression_ratios[i], req.image_compression_ratios[i], req.image_compression_ratios[i]);
+			build_image_clouds(flat_image_pcl, spherical_image_lobed_pcl, spherical_image_pcl, resized_image_ptr, req.camera_frames[i], req.target_frame, req.projections[i], req.max_image_angles[i], req.image_list[i].height/req.image_compression_ratios[i], req.image_list[i].width/req.image_compression_ratios[i], i);
+		}
+		else
+		{	
+			time_elapsed = ros::Time::now() - start_time;
+			ROS_DEBUG_STREAM("resized CV objects " << time_elapsed);
+			build_image_clouds(flat_image_pcl, spherical_image_lobed_pcl, spherical_image_pcl, image_ptr, req.camera_frames[i], req.target_frame, req.projections[i], req.max_image_angles[i], req.image_list[i].height/req.image_compression_ratios[i], req.image_list[i].width/req.image_compression_ratios[i], i);
+		}
+		time_elapsed = ros::Time::now() - start_time;
+		ROS_DEBUG_STREAM("created image clouds " << time_elapsed);
+		res.image_preprocessing_times.push_back(time_elapsed.toSec());
+	}
+
+	// ------ Voxelization of Clouds ------
+	ROS_DEBUG_STREAM("[PointcloudPainter] RGB clouds built. Size: " << spherical_image_pcl->points.size());
+	if(req.voxelize_rgb_images)
+	{
+		// Voxelize Flat Cloud
+		pcl::VoxelGrid<pcl::PointXYZRGB> vg;
+		vg.setInputCloud(flat_image_pcl);
+		vg.setLeafSize(req.flat_voxel_size, req.flat_voxel_size, req.flat_voxel_size);
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_pcp = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
+		vg.filter(*temp_pcp);
+		*flat_image_pcl = *temp_pcp;
+		// Time Debugging
+		time_elapsed = ros::Time::now() - start_time;
+		ROS_DEBUG_STREAM("voxelized flat image cloud " << time_elapsed);
+
+		// Voxelize Spherical Cloud (Lobed)
+		vg.setInputCloud(spherical_image_lobed_pcl);
+		vg.setLeafSize(req.spherical_voxel_size, req.spherical_voxel_size, req.spherical_voxel_size);
+		temp_pcp->points.clear();
+		vg.filter(*temp_pcp);
+		*spherical_image_lobed_pcl = *temp_pcp;
+		// Time Debugging
+		time_elapsed = ros::Time::now() - start_time;
+		ROS_DEBUG_STREAM("voxelized spherical lobed image cloud " << time_elapsed);
+
+		// Voxelize Spherical Cloud (Collapsed)
+		vg.setInputCloud(spherical_image_pcl);
+		temp_pcp->points.clear();
+		vg.filter(*temp_pcp);
+		*spherical_image_pcl = *temp_pcp;
+		// Time Debugging
+		time_elapsed = ros::Time::now() - start_time;
+		ROS_DEBUG_STREAM("voxelized spherical image cloud " << time_elapsed);
+	}
+
+	res.image_voxelizing_time = time_elapsed.toSec();
+	ROS_DEBUG_STREAM("[PointcloudPainter] RGB Cloud Size following Voxelization: " << spherical_image_pcl->points.size());
+
+
+
+	// ----------------------------------------------------------------------------------
+	// ------------------------------------- PAINT --------------------------------------
+	// ----------------------------------------------------------------------------------
 
 	sensor_msgs::PointCloud2 image_flat_out;
 	pcl::toROSMsg(*flat_image_pcl, image_flat_out);
@@ -211,7 +213,7 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	time_elapsed = ros::Time::now() - start_time;
 	ROS_INFO_STREAM("published image clouds " << time_elapsed);
 
-	neighbor_color_search(output_pcl, input_pcl_projected, input_depth_pcl, spherical_image_pcl, req.image_front.height, req.image_front.width, req.neighbor_search_count);
+	neighbor_color_search(output_pcl, input_pcl_projected, input_depth_pcl, spherical_image_pcl, req.image_list[0].height, req.image_list[0].width, req.neighbor_search_count);
 	time_elapsed = ros::Time::now() - start_time;
 	ROS_INFO_STREAM("performed color neighbor search " << time_elapsed);
 	sensor_msgs::PointCloud2 final_cloud;
@@ -269,29 +271,30 @@ bool PointcloudPainter::downsample_image(cv_bridge::CvImagePtr image_out, cv_bri
 	image_out->encoding = image_in->encoding;
 }
 
-bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_flat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_spherical_lobed, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_spherical, cv_bridge::CvImagePtr cv_image, std::string camera_frame, std::string target_frame, int projection, float max_angle, int image_hgt, int image_wdt, bool flip_cloud)
+bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_flat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_spherical_lobed, pcl::PointCloud<pcl::PointXYZRGB>::Ptr &pcl_spherical, cv_bridge::CvImagePtr cv_image, std::string camera_frame, std::string target_frame, int projection, float max_angle, int image_hgt, int image_wdt, int image_number)
 {
 	pcl::PointCloud<pcl::PointXYZRGB> untransformed_sphere_pcl;
 
 	// Determine real image dimensions (to project properly to a R=1m sphere)
 	float plane_width, X_max_dist, Z_max_dist;
+	float flat_image_distance;
 	switch(projection)
 	{
-		case 1:
+		case PAINTER_PROJ_EQUA_STEREO:
 			// X position on the sphere where the highest angle allowed by the lens penetrates it from the origin:
 			X_max_dist = cos( (max_angle-180)/2 *3.14159/180 ); 	
 			Z_max_dist = sin( (max_angle-180)/2 *3.14159/180 );
 			// maximum width of planar projection such that it will wrap properly to a R=1m sphere (since lenses do not have a 360 FOV, and blank areas are omitted from file)
 			plane_width = X_max_dist/(1 - Z_max_dist);
 			break;
-		case 2:
+		case PAINTER_PROJ_POLE_STEREO:
 			// X position on the sphere where the highest angle allowed by the lens penetrates it from the origin:
 			X_max_dist = cos( (max_angle-180)/2 *3.14159/180 );
 			Z_max_dist = sin( (max_angle-180)/2 *3.14159/180 );
 			// maximum width of planar projection such that it will wrap properly to a R=1m sphere (since lenses do not have a 360 FOV, and blank areas are omitted from file)
 			plane_width = X_max_dist/(1 - Z_max_dist) *2;
 			break;
-		case 3:
+		case PAINTER_PROJ_EQUAL_AREA:
 			// X and Z position on the sphere where the highest angle allowed by the lens penetrates it from the origin:
 			X_max_dist = cos( (max_angle-180)/2 *3.14159/180 );
 			Z_max_dist = sin( (max_angle-180)/2 *3.14159/180 );
@@ -299,6 +302,10 @@ bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Pt
 			//Z_max_dist = 1 - sin( (-90 + (max_angle-180)) *3.14159/180);
 			// maximum width of planar projection such that it will wrap properly to a R=1m sphere (since lenses do not have a 360 FOV, and blank areas are omitted from file)
 			plane_width = sqrt(2/(1-Z_max_dist)) * X_max_dist;
+			break;
+		case PAINTER_PROJ_FLAT:
+			plane_width = 2*sin( max_angle/2 *3.14159/180 );
+			flat_image_distance = cos( max_angle/2 *3.14159/180 );
 			break;
 	}
 	ROS_INFO_STREAM(X_max_dist << " " << Z_max_dist << " " << plane_width);
@@ -329,10 +336,11 @@ bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Pt
 			point_sphere.g = point_flat.g;
 			point_sphere.b = point_flat.b;
 			// ----- Set XYZ -----
+			bool cut_corners = true;
 			switch(projection)
 			{
 				float xs, ys;
-				case 1:
+				case PAINTER_PROJ_EQUA_STEREO:
 					// Account for FOV lens angle being less than 360 degrees
 					xs = (float(i)/image_hgt - 0.5) * plane_width * 2;
 					ys = (float(j)/image_wdt - 0.5) * plane_width * 2;
@@ -341,7 +349,7 @@ bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Pt
 					point_sphere.y = ( 2*ys/(1 + pow(xs,2) + pow(ys,2)) );
 					point_sphere.z = ( (-1 + pow(xs,2) + pow(ys,2))/(1 + pow(xs,2) + pow(ys,2)) );
 					break;
-				case 2:
+				case PAINTER_PROJ_POLE_STEREO:
 					// Account for FOV lens angle being less than 360 degrees
 					xs = (float(i)/image_hgt - 0.5) * plane_width * 4;
 					ys = (float(j)/image_wdt - 0.5) * plane_width * 4;
@@ -350,7 +358,7 @@ bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Pt
 					point_sphere.y = ( 2*ys/(1 + pow(xs,2) + pow(ys,2)) );
 					point_sphere.z = ( (-1 + pow(xs,2) + pow(ys,2))/(1 + pow(xs,2) + pow(ys,2)) );
 					break;
-				case 3:
+				case PAINTER_PROJ_EQUAL_AREA:
 					// Account for FOV lens angle being less than 360 degrees
 					xs = (float(i)/image_hgt - 0.5) * plane_width * 2;
 					ys = (float(j)/image_wdt - 0.5) * plane_width * 2;
@@ -359,20 +367,21 @@ bool PointcloudPainter::build_image_clouds(pcl::PointCloud<pcl::PointXYZRGB>::Pt
 					point_sphere.y = sqrt( 1 - (pow(xs,2) + pow(ys,2))/4 ) * ys;
 					point_sphere.z = ( -1 + (pow(xs,2) + pow(ys,2))/2 );
 					break;
-			}
-
-			if(flip_cloud)
-			{
-				point_flat.x += 1; 		// Offset by one meter (because images are 1x1 m)
-				point_sphere.z *= -1;
-				point_sphere.y *= -1;
+				case PAINTER_PROJ_FLAT:
+					float point_distance = sqrt( pow(point_flat.x/image_hgt*plane_width,2) + pow(point_flat.y/image_hgt*plane_width,2) + pow(flat_image_distance,2) );
+					point_sphere.x = point_flat.x/point_distance;
+					point_sphere.y = point_flat.y/point_distance;
+					point_sphere.z = -flat_image_distance/point_distance;
+					cut_corners = false;
+					break;
 			}
 
 			// ------------------ Add to cloud ------------------
+			point_flat.x += image_number;
 			pcl_flat->points.push_back(point_flat);
 			// Only include points in spherical cloud which are inside 1x1 circle (disclude extra black points from around input image)
-			float radius = sqrt(pow(point_flat.x-float(flip_cloud),2) + pow(point_flat.y,2));
-			if(radius <= 0.5)
+			float radius = sqrt(pow(point_flat.x-image_number,2) + pow(point_flat.y,2));
+			if(radius <= 0.5 || !cut_corners)
 			{
 				untransformed_sphere_pcl.points.push_back(point_sphere);
 			}
@@ -486,26 +495,35 @@ bool PointcloudPainter::neighbor_color_search(pcl::PointCloud<pcl::PointXYZRGB>:
 
 		if ( kdtree.nearestKSearch (point, k, nearest_indices, nearest_dist_squareds) > 0 )
 		{
-			// Currently, just assign colors as inverse-distance weighted average of neighbor colors
-			float total_inverse_dist = 0;
-			float r_temp = 0;
-			float g_temp = 0;
-			float b_temp = 0;
-			// Iterate over each neighbor
-			for(int j=0; j<nearest_indices.size(); j++)
+			if(nearest_dist_squareds[0] < .05)
 			{
-				// For each neighbor, add its weighted color to the total for the target point
-				float dist = pow(nearest_dist_squareds[j],0.5);
-				r_temp += float(rgb_cloud->points[nearest_indices[j]].r) / dist;
-				g_temp += float(rgb_cloud->points[nearest_indices[j]].g) / dist;
-				b_temp += float(rgb_cloud->points[nearest_indices[j]].b) / dist;
-				// Increment the total distance by the distance to this neighbor
-				total_inverse_dist += 1/dist;
+				// Currently, just assign colors as inverse-distance weighted average of neighbor colors
+				float total_inverse_dist = 0;
+				float r_temp = 0;
+				float g_temp = 0;
+				float b_temp = 0;
+				// Iterate over each neighbor
+				for(int j=0; j<nearest_indices.size(); j++)
+				{
+					// For each neighbor, add its weighted color to the total for the target point
+					float dist = pow(nearest_dist_squareds[j],0.5);
+					r_temp += float(rgb_cloud->points[nearest_indices[j]].r) / dist;
+					g_temp += float(rgb_cloud->points[nearest_indices[j]].g) / dist;
+					b_temp += float(rgb_cloud->points[nearest_indices[j]].b) / dist;
+					// Increment the total distance by the distance to this neighbor
+					total_inverse_dist += 1/dist;
+				}
+				// Correct for distance weights!
+				point.r = int(round(r_temp / total_inverse_dist));
+				point.g = int(round(g_temp / total_inverse_dist));
+				point.b = int(round(b_temp /total_inverse_dist));
 			}
-			// Correct for distance weights!
-			point.r = int(round(r_temp / total_inverse_dist));
-			point.g = int(round(g_temp / total_inverse_dist));
-			point.b = int(round(b_temp /total_inverse_dist));
+			else 	// If none of the neighbors are close enough, just make the point black
+			{ 
+				point.r = 0;
+				point.g = 0;
+				point.b = 0;
+			}
 			// Correct XYZ values for projected depth cloud back to original values
 			point.x = depth_cloud->points[i].x;
 			point.y = depth_cloud->points[i].y;

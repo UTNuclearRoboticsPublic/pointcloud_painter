@@ -41,7 +41,7 @@ int main(int argc, char** argv)
 	ros::init(argc, argv, "active_painter_demo");
 
 	ros::NodeHandle nh;
-
+/*
 	std::string service_name;
 	nh.param<std::string>("/pointcloud_painter/service_name", service_name, "/pointcloud_painter/paint");
 	ros::ServiceClient painter_srv = nh.serviceClient<pointcloud_painter::pointcloud_painter_srv>(service_name);
@@ -169,5 +169,5 @@ int main(int argc, char** argv)
 		if(!should_loop)
 			break;
 	}	
-	
+	*/
 }	

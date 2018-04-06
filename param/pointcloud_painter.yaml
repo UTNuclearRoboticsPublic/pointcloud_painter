@@ -1,16 +1,14 @@
 
 pointcloud_painter:
-  service_name:             pointcloud_painter/paint
+  painter_service_name:     pointcloud_painter/paint
+  stitcher_service_name:    laser_stitcher/stationary_scan
   should_loop:              false
-  max_lens_angle:           207
-  projection_type:          1
+  max_lens_angle:           90
+  projection_type:          4
   neighbor_search_count:    1
-  voxelize_rgb_images:      false
   flat_voxel_size:          0.0025
   spherical_voxel_size:     0.002
-  voxelize_depth_cloud:     false
-  depth_voxel_size:         0.05
-  compress_image:           false
+  compress_image:           true
   image_compression_ratio:  2
   camera_frame_front:       front_camera_frame
   camera_frame_rear:        rear_camera_frame
