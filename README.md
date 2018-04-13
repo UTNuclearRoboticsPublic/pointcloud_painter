@@ -23,5 +23,29 @@ Commercial stereo vision and structure-from-motion sensors allow simultaneous es
 This kind of approach lends itself best to large surfaces being painted in uncluttered scenes, where there is not much complexity of fore- vs background. Differences in occlusion of further objects by closer ones from the respective perspectives of the depth and RGB sensors can lead to problems for very cluttered scenes. These errors are reduced for smaller offsets between the sensors and for objects that are more distant. We are aiming to develop a sensor tree which places these two sensors essentially on top of one another, which should largely eliminate this problem.
 
 ## Parameter Setup
+The pointcloud_painter is controlled by parameters specified in a yaml file in param/. The settings are loaded on the client end, not in the pointcloud_painter service node itself, so if a new client is written for a custom application the parameter-handling in src/painter_client.cpp should be replicated there. 
+
+- **painter_service_name:** the name of the service to be called by an external client
+- **should_loop:** whether or not the client side should loop
+- **max_lens_angle:** the maximum lens angle visible through the camera
+- **projection_type:** the type of projection used - see srv/pointcloud_painter_srv.srv for projection type designations
+- **neighbor_search_count** the number of color neighbors to search for for each depth point to be painted
+- **flat_voxel_size** the voxelization size for the RGB image input in planar cloud space
+- **spherical_voxel_size** the voxelization size for the RGB image input in spherical cloud space
+- **compress_image** whether or not to lossily compress the input raster image
+- **image_compression_ratio** if (compress_image), the factor by which it should be compressed
+- **camera_frame_front** the name of the frame used for the front camera
+- **camera_frame_rear** the name of the frame used for the rear camera
+- **target_frame** the name of the target frame in which the output is published
 
 ## Usage
+As is, the program can be run by launching the launch/pointcloud_painter.launch file. 
+```
+roslaunch pointcloud_painter pointcloud_painter.launch
+```
+
+The user can also construct their own client file to interface with the pointcloud_painter server. If doing so, all that should be necessary is to run the associated client file (and any yaml files or parameter loading necessary) as well as the pointcloud_painter.srv node itself:
+
+```
+rosrun pointcloud_painter pointcloud_painter
+```
