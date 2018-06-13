@@ -1,7 +1,6 @@
 
 pointcloud_painter:
   painter_service_name:     pointcloud_painter/paint
-  stitcher_service_name:    laser_stitcher/stationary_scan
   should_loop:              false
   max_lens_angle:           90
   projection_type:          4

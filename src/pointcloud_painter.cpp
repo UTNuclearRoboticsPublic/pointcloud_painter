@@ -39,7 +39,7 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	// ------------------------------- SET UP DEPTH CLOUD -------------------------------
 	// ----------------------------------------------------------------------------------
 	
-	// ------ Transform input_cloud to camera_frame ------
+	// ------ Transform input_cloud (depth information) to camera_frame ------
 	std::string cloud_frame = req.input_cloud.header.frame_id;
 	sensor_msgs::PointCloud2 transformed_depth_cloud;
 	if(camera_frame_listener_.waitForTransform(cloud_frame, req.target_frame, ros::Time(0), ros::Duration(0.5)))  
@@ -102,8 +102,6 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	time_elapsed = ros::Time::now() - start_time;
 	ROS_DEBUG_STREAM("projected depth cloud to sphere " << time_elapsed);
 	res.depth_preprocessing_time = time_elapsed.toSec();
-
-
 
 	// ----------------------------------------------------------------------------------
 	// -------------------------------- SET UP RGB CLOUDS -------------------------------
@@ -192,39 +190,50 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	// ------------------------------------- PAINT --------------------------------------
 	// ----------------------------------------------------------------------------------
 
+	// Create Flat Image Message (sensor_msgs/PointCloud2)
 	sensor_msgs::PointCloud2 image_flat_out;
 	pcl::toROSMsg(*flat_image_pcl, image_flat_out);
 	image_flat_out.header.frame_id = "map";
 	ros::Publisher pub_flat = nh_.advertise<sensor_msgs::PointCloud2>("image_out_flat", 1, this);
 	pub_flat.publish(image_flat_out);
 
+	// Create Spherical Lobed Image Message (sensor_msgs/PointCloud2)
 	sensor_msgs::PointCloud2 image_sphere_lobed_out;
 	pcl::toROSMsg(*spherical_image_lobed_pcl, image_sphere_lobed_out);
 	image_sphere_lobed_out.header.frame_id = "map";
 	ros::Publisher pub_sphere_lobed = nh_.advertise<sensor_msgs::PointCloud2>("image_out_sphere_lobed", 1, this);
 	pub_sphere_lobed.publish(image_sphere_lobed_out);
 
+	// Create Spherical Image Message (sensor_msgs/PointCloud2)
 	sensor_msgs::PointCloud2 image_sphere_out;
 	pcl::toROSMsg(*spherical_image_pcl, image_sphere_out);
 	image_sphere_out.header.frame_id = req.target_frame;
 	ros::Publisher pub_sphere = nh_.advertise<sensor_msgs::PointCloud2>("image_out_sphere", 1, this);
 	pub_sphere.publish(image_sphere_out);
 
+	// Find Time Now
 	time_elapsed = ros::Time::now() - start_time;
 	ROS_INFO_STREAM("published image clouds " << time_elapsed);
-
+	// ***********************
+	// ***** Run Painter *****
+	// ***********************
 	neighbor_color_search(output_pcl, input_pcl_projected, input_depth_pcl, spherical_image_pcl, req.image_list[0].height, req.image_list[0].width, req.neighbor_search_count);
+	// Find Elapsed Time
 	time_elapsed = ros::Time::now() - start_time;
 	ROS_INFO_STREAM("performed color neighbor search " << time_elapsed);
+	
+	// Cteate Final RGBXYZ Cloud Message (sensor_msgs/PointCloud2)
 	sensor_msgs::PointCloud2 final_cloud;
 	pcl::toROSMsg(*output_pcl, final_cloud);
 	final_cloud.header.frame_id = req.target_frame;
 	ros::Publisher pub_final = nh_.advertise<sensor_msgs::PointCloud2>("final_cloud", 1, this);
 	pub_final.publish(final_cloud);
 
+	// Publish the Input Depth Cloud (sensor_msgs/PointCloud2)
 	ros::Publisher pub_input_depth = nh_.advertise<sensor_msgs::PointCloud2>("input_depth_cloud", 1, this);
 	pub_input_depth.publish(req.input_cloud);
 
+	// Publish the Input Depth Cloud (projected to sphere) (sensor_msgs/PointCloud2)
 	sensor_msgs::PointCloud2 input_depth_projected;
 	pcl::toROSMsg(input_pcl_projected_intensity, input_depth_projected);
 	input_depth_projected.header.frame_id = req.target_frame;
