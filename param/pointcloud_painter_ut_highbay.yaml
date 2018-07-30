@@ -1,0 +1,21 @@
+
+pointcloud_painter:
+  painter_service_name:     pointcloud_painter/paint
+  should_loop:              false
+  max_lens_angle:           207 #30
+  projection_type:          1
+  neighbor_search_count:    1
+  depth_voxel_size:         0.01
+  flat_voxel_size:          0.0025
+  spherical_voxel_size:     0.002
+  compress_image:           true
+  image_compression_ratio:  2
+  camera_frame_left:        front_camera_frame
+  camera_frame_right:       rear_camera_frame
+  target_frame:             target_frame
+  bag_name_left:            /home/conor/catkin-ws/src/pointcloud_painter/data/front_view_image_360.bag
+  bag_name_right:           /home/conor/catkin-ws/src/pointcloud_painter/data/rear_view_image_360.bag
+  bag_name_depth:           /home/conor/catkin-ws/src/pointcloud_painter/data/local_dense_cloud.bag
+  left_image_topic:         front_camera/image_raw
+  right_image_topic:        rear_camera/image_raw
+  depth_cloud_topic:        /laser_stitcher/local_dense_cloud

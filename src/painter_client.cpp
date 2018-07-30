@@ -44,26 +44,38 @@ int main(int argc, char** argv)
 	nh.param<bool>("/pointcloud_painter/voxelize_depth_cloud", voxelize_depth_cloud, true);
 	nh.param<float>("/pointcloud_painter/depth_voxel_size", depth_voxel_size, 0.05);
 	
-	std::string camera_frame_front, camera_frame_rear, target_frame;
-	nh.param<std::string>("/pointcloud_painter/camera_frame_front", camera_frame_front, "front_camera_frame");
-	nh.param<std::string>("/pointcloud_painter/camera_frame_rear", camera_frame_rear, "rear_camera_frame");
+	std::string camera_frame_left, camera_frame_right, target_frame;
+	nh.param<std::string>("/pointcloud_painter/camera_frame_left", camera_frame_left, "left_camera_frame");
+	nh.param<std::string>("/pointcloud_painter/camera_frame_right", camera_frame_right, "right_camera_frame");
 	nh.param<std::string>("/pointcloud_painter/target_frame", target_frame, "target_frame");
+
+	std::string left_bag_topic, right_bag_topic, cloud_bag_topic;
+	nh.param<std::string>("/pointcloud_painter/left_image_topic", left_bag_topic, "/camera1/usb_cam1/image_raw");
+	nh.param<std::string>("/pointcloud_painter/right_image_topic", right_bag_topic, "/camera1/usb_cam1/image_raw");
+	nh.param<std::string>("/pointcloud_painter/depth_cloud_topic", cloud_bag_topic, "/laser_stitcher/local_dense_cloud");
+
+	std::string left_bag_name, right_bag_name, cloud_bag_name;
+	nh.param<std::string>("/pointcloud_painter/bag_name_left", left_bag_name, "/home/conor/catkin-ws/data/Highbay_Scans_SRS/pointcloud_painting_test/left_camera.bag");
+	nh.param<std::string>("/pointcloud_painter/bag_name_right", right_bag_name, "/home/conor/catkin-ws/data/Highbay_Scans_SRS/pointcloud_painting_test/right_camera.bag");
+	nh.param<std::string>("/pointcloud_painter/bag_name_depth", cloud_bag_name, "/home/conor/catkin-ws/data/Highbay_Scans_SRS/pointcloud_painting_test/with_cameras_scan.bag");
 
 	// ---------------------------------------------------------------------------
 	// ------------------------ Extract Data from ROSBAGs ------------------------
 	// ---------------------------------------------------------------------------
 
 	// ------------- Bag Names and Topics -------------
-	std::string cloud_bag_name = "/home/conor/catkin-ws/data/Painting/local_dense_cloud.bag";
-	//std::string cloud_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/local_dense_cloud.bag";
-	std::string front_bag_name = 	"/home/conor/catkin-ws/data/Painting/2018-03-15-16-11-12.bag";
-	//std::string front_bag_name = 	"/home/conor/catkin-ws/data/Painting/front_view_image_360.bag";
-	std::string rear_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/rear_view_image_360.bag";
-	std::string cloud_bag_topic = 	"/laser_stitcher/local_dense_cloud";
-	std::string front_bag_topic = 	"/camera_ee/rgb/image_raw";
-	std::string rear_bag_topic = 	"rear_camera/image_raw";
-	ROS_INFO_STREAM("[PointcloudPainter] Loading data from bag files.");
+//	//std::string cloud_bag_name = "/home/conor/catkin-ws/data/Painting/local_dense_cloud.bag";
+//	std::string cloud_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/local_dense_cloud.bag";
+//	//td::string left_bag_name = 	"/home/conor/catkin-ws/data/Painting/2018-03-15-16-11-12.bag";
+//	std::string left_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/left_view_image_360.bag";
+//	std::string right_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/right_view_image_360.bag";
+//	std::string cloud_bag_topic = 	"/laser_stitcher/local_dense_cloud";
+//	//std::string left_bag_topic = 	"/camera_ee/rgb/image_raw";
+//	std::string left_bag_topic = 	"left_camera/image_raw";
+//	std::string right_bag_topic = 	"right_camera/image_raw";
 
+	ROS_INFO_STREAM("[PointcloudPainter] Loading data from bag files....");
+	ROS_INFO_STREAM("                      Getting cloud data from file " << cloud_bag_name << " using topic " << cloud_bag_topic);
 	// ------------- First Bag - CLOUD -------------
 	sensor_msgs::PointCloud2 pointcloud;
 	rosbag::Bag cloud_bag; 
@@ -83,61 +95,61 @@ int main(int argc, char** argv)
     }
     cloud_bag.close(); 
 
-    // ------------- Second Bag - FRONT IMAGE -------------
-    sensor_msgs::Image front_image;
-	rosbag::Bag front_bag; 
-	front_bag.open(front_bag_name, rosbag::bagmode::Read);
+	ROS_INFO_STREAM("                      Getting left image data from file " << left_bag_name << " using topic " << left_bag_topic);
+    // ------------- Second Bag - left IMAGE -------------
+    sensor_msgs::Image left_image;
+	rosbag::Bag left_bag; 
+	left_bag.open(left_bag_name, rosbag::bagmode::Read);
 
-	std::vector<std::string> front_topics;
-	front_topics.push_back(front_bag_topic);
-	rosbag::View view_front(front_bag, rosbag::TopicQuery(front_topics));
+	std::vector<std::string> left_topics;
+	left_topics.push_back(left_bag_topic);
+	rosbag::View view_left(left_bag, rosbag::TopicQuery(left_topics));
 
-	BOOST_FOREACH(rosbag::MessageInstance const m, view_front)
+	BOOST_FOREACH(rosbag::MessageInstance const m, view_left)
     {
-        sensor_msgs::Image::ConstPtr front_ptr = m.instantiate<sensor_msgs::Image>();
-        if (front_ptr != NULL)
-            front_image = *front_ptr;
+        sensor_msgs::Image::ConstPtr left_ptr = m.instantiate<sensor_msgs::Image>();
+        if (left_ptr != NULL)
+            left_image = *left_ptr;
         else
-        	ROS_ERROR_STREAM("[PointcloudPainter] Front image retrieved from bag is null...");
+        	ROS_ERROR_STREAM("[PointcloudPainter] left image retrieved from bag is null...");
     }
-    front_bag.close();
+    left_bag.close();
 
-    // ------------- Third Bag - REAR IMAGE -------------
-    sensor_msgs::Image rear_image;
-	rosbag::Bag rear_bag; 
-	rear_bag.open(rear_bag_name, rosbag::bagmode::Read);
+	ROS_INFO_STREAM("                      Getting right image data from file " << right_bag_name << " using topic " << right_bag_topic);
+    // ------------- Third Bag - right IMAGE -------------
+    sensor_msgs::Image right_image;
+	rosbag::Bag right_bag; 
+	right_bag.open(right_bag_name, rosbag::bagmode::Read);
 
-	std::vector<std::string> rear_topics;
-	rear_topics.push_back(rear_bag_topic);
-	rosbag::View view_rear(rear_bag, rosbag::TopicQuery(rear_topics));
+	std::vector<std::string> right_topics;
+	right_topics.push_back(right_bag_topic);
+	rosbag::View view_right(right_bag, rosbag::TopicQuery(right_topics));
 
-	BOOST_FOREACH(rosbag::MessageInstance const m, view_rear)
+	BOOST_FOREACH(rosbag::MessageInstance const m, view_right)
     {
     	ROS_INFO_STREAM("opening this bit..." );
-        sensor_msgs::Image::ConstPtr rear_ptr = m.instantiate<sensor_msgs::Image>();
-        if (rear_ptr != NULL)
-            rear_image = *rear_ptr;
+        sensor_msgs::Image::ConstPtr right_ptr = m.instantiate<sensor_msgs::Image>();
+        if (right_ptr != NULL)
+            right_image = *right_ptr;
         else
-        	ROS_ERROR_STREAM("[PointcloudPainter] Front image retrieved from bag is null...");
+        	ROS_ERROR_STREAM("[PointcloudPainter] left image retrieved from bag is null...");
     }
-    rear_bag.close();
-
-    ROS_INFO_STREAM("fkjljwe " << rear_image.height << " " << rear_image.width);
+    right_bag.close();
 
 	// -------- Set up service object --------
 	pointcloud_painter::pointcloud_painter_srv srv;
 	// -------- Data --------
 	srv.request.input_cloud = pointcloud;
 	srv.request.input_cloud.header.stamp = ros::Time::now();
-	srv.request.image_list.push_back(front_image);
-	srv.request.image_list.push_back(rear_image);
-	srv.request.image_names.push_back("front_image");
-	srv.request.image_names.push_back("rear_image");
+	srv.request.image_list.push_back(left_image);
+	srv.request.image_list.push_back(right_image);
+	srv.request.image_names.push_back("left_image");
+	srv.request.image_names.push_back("right_image");
 	// -------- Projection Stuff --------
 	srv.request.projections.push_back(projection_type);
-	srv.request.projections.push_back(1);
+	srv.request.projections.push_back(projection_type);//1);
 	srv.request.max_image_angles.push_back(max_lens_angle);
-	srv.request.max_image_angles.push_back(260);
+	srv.request.max_image_angles.push_back(max_lens_angle);//260);
 	srv.request.neighbor_search_count = neighbor_search_count;
 	// -------- Compression --------
 	// Raster-space Compression
@@ -152,11 +164,11 @@ int main(int argc, char** argv)
 	srv.request.voxelize_depth_cloud = voxelize_depth_cloud;
 	srv.request.depth_voxel_size = depth_voxel_size;
 	// -------- Frames --------
-	srv.request.camera_frames.push_back(camera_frame_front);
-	srv.request.camera_frames.push_back(camera_frame_rear);
+	srv.request.camera_frames.push_back(camera_frame_left);
+	srv.request.camera_frames.push_back(camera_frame_right);
 	srv.request.target_frame = target_frame;
 
-	ROS_ERROR_STREAM("first: " << front_image.header.frame_id << " " << rear_image.header.frame_id);
+	ROS_ERROR_STREAM("first: " << left_image.header.frame_id << " " << right_image.header.frame_id);
 
 	ros::Duration(1.0).sleep();
 

@@ -1,0 +1,46 @@
+
+<launch>
+	
+	<rosparam  command="load"  file="$(find pointcloud_painter)/param/pointcloud_painter_ut_highbay.yaml"/>
+	
+	<node
+		name    = "pointcloud_painter"
+      	pkg     = "pointcloud_painter"
+      	type    = "pointcloud_painter"
+      	output  = "screen"
+  	> 
+	</node>
+
+	<node
+		name    = "painter_client"
+      	pkg     = "pointcloud_painter"
+      	type    = "painter_client"
+      	output  = "screen"
+  	> 
+	</node>
+
+	<!-- Static Transform Publishers !-->
+	<node
+		name    = "map_publisher"   pkg = "tf"   type = "static_transform_publisher"
+      	args  	= "0 0 0 0 0 0 		/world 	/map 	100"
+  	> </node>
+	<node
+		name    = "front_cam_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
+      	args  	= "-0.295 0.01 1.02 0.0 1.57 3.14159 		/map  /target_frame 	100"
+  	> </node>
+	<node
+		name    = "rear_cam_body_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
+		args 	= "0.435, -0.294, 0.974 -0.049, -0.035, 0.170  	/map  /front_camera_body 	100"
+  	> </node> 	
+  	<node
+		name    = "rear_cam_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
+		args 	= "-0.28 0.01 1.02 0.0 1.57 3.14159  	/map  /front_camera_frame 	100"
+  	> </node> 	
+	<node
+		name    = "target_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
+      	args  	= "-0.31 0.01 1.02 3.14159 1.57 3.14159  /map  /rear_camera_frame 		100"
+  	> </node>
+
+</launch>
+
+<!--args  	= "0.0 0.0 0.0 3.14159 1.57 0.0  	/front_camera_body  /front_camera_frame 	100"!-->

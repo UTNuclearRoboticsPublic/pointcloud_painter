@@ -33,8 +33,6 @@ bool PointcloudPainter::paint_pointcloud(pointcloud_painter::pointcloud_painter_
 	ros::Time start_time = ros::Time::now();
 	ros::Duration time_elapsed;
 
-
-
 	// ----------------------------------------------------------------------------------
 	// ------------------------------- SET UP DEPTH CLOUD -------------------------------
 	// ----------------------------------------------------------------------------------
@@ -549,6 +547,10 @@ bool PointcloudPainter::neighbor_color_search(pcl::PointCloud<pcl::PointXYZRGB>:
 
 int main(int argc, char** argv)
 {
+  if( ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug) )
+    ros::console::notifyLoggerLevelsChanged();  
+
+	
 	ros::init(argc, argv, "pointcloud_processing_server");
 
 	pcl::console::setVerbosityLevel(pcl::console::L_ALWAYS);
