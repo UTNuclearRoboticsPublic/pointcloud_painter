@@ -523,8 +523,8 @@ bool PointcloudPainter::neighbor_color_search(pcl::PointCloud<pcl::PointXYZRGB>:
 				// Correct for distance weights!
 				point.r = int(round(r_temp / total_inverse_dist));
 				point.g = int(round(g_temp / total_inverse_dist));
-				point.b = int(round(b_temp /total_inverse_dist));
-			}
+				point.b = int(round(b_temp / total_inverse_dist));
+			} 
 			else 	// If none of the neighbors are close enough, just make the point black
 			{ 
 				point.r = 0;
