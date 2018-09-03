@@ -13,9 +13,9 @@ pointcloud_painter:
   camera_frame_left:        front_camera_frame
   camera_frame_right:       rear_camera_frame
   target_frame:             target_frame
-  bag_name_left:            /home/conor/catkin-ws/src/pointcloud_painter/data/front_view_image_360.bag
-  bag_name_right:           /home/conor/catkin-ws/src/pointcloud_painter/data/rear_view_image_360.bag
-  bag_name_depth:           /home/conor/catkin-ws/src/pointcloud_painter/data/local_dense_cloud.bag
+  bag_name_left:            /home/conor/ros_data/Painting/ut_highbay/front_view_image_360.bag
+  bag_name_right:           /home/conor/ros_data/Painting/ut_highbay/rear_view_image_360.bag
+  bag_name_depth:           /home/conor/ros_data/Painting/ut_highbay/local_dense_cloud.bag
   left_image_topic:         front_camera/image_raw
   right_image_topic:        rear_camera/image_raw
   depth_cloud_topic:        /laser_stitcher/local_dense_cloud

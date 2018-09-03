@@ -55,20 +55,20 @@ int main(int argc, char** argv)
 	nh.param<std::string>("/pointcloud_painter/depth_cloud_topic", cloud_bag_topic, "/laser_stitcher/local_dense_cloud");
 
 	std::string left_bag_name, right_bag_name, cloud_bag_name;
-	nh.param<std::string>("/pointcloud_painter/bag_name_left", left_bag_name, "/home/conor/catkin-ws/data/Highbay_Scans_SRS/pointcloud_painting_test/left_camera.bag");
-	nh.param<std::string>("/pointcloud_painter/bag_name_right", right_bag_name, "/home/conor/catkin-ws/data/Highbay_Scans_SRS/pointcloud_painting_test/right_camera.bag");
-	nh.param<std::string>("/pointcloud_painter/bag_name_depth", cloud_bag_name, "/home/conor/catkin-ws/data/Highbay_Scans_SRS/pointcloud_painting_test/with_cameras_scan.bag");
+	nh.param<std::string>("/pointcloud_painter/bag_name_left", left_bag_name, "/home/conor/ros_data/Highbay_Scans_SRS/pointcloud_painting_test/left_camera.bag");
+	nh.param<std::string>("/pointcloud_painter/bag_name_right", right_bag_name, "/home/conor/ros_data/Highbay_Scans_SRS/pointcloud_painting_test/right_camera.bag");
+	nh.param<std::string>("/pointcloud_painter/bag_name_depth", cloud_bag_name, "/home/conor/ros_data/Highbay_Scans_SRS/pointcloud_painting_test/with_cameras_scan.bag");
 
 	// ---------------------------------------------------------------------------
 	// ------------------------ Extract Data from ROSBAGs ------------------------
 	// ---------------------------------------------------------------------------
 
 	// ------------- Bag Names and Topics -------------
-//	//std::string cloud_bag_name = "/home/conor/catkin-ws/data/Painting/local_dense_cloud.bag";
-//	std::string cloud_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/local_dense_cloud.bag";
-//	//td::string left_bag_name = 	"/home/conor/catkin-ws/data/Painting/2018-03-15-16-11-12.bag";
-//	std::string left_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/left_view_image_360.bag";
-//	std::string right_bag_name = 	"/home/conor/catkin-ws/src/pointcloud_painter/data/right_view_image_360.bag";
+//	//std::string cloud_bag_name = "/home/conor/ros_data/Painting/local_dense_cloud.bag";
+//	std::string cloud_bag_name = 	"/home/conor/ros_data/Painting/ut_highbay/local_dense_cloud.bag";
+//	//td::string left_bag_name = 	"/home/conor/ros_data/Painting/2018-03-15-16-11-12.bag";
+//	std::string left_bag_name = 	"/home/conor/ros_data/Painting/ut_highbay/left_view_image_360.bag";
+//	std::string right_bag_name = 	"/home/conor/ros_data/Painting/ut_highbay/right_view_image_360.bag";
 //	std::string cloud_bag_topic = 	"/laser_stitcher/local_dense_cloud";
 //	//std::string left_bag_topic = 	"/camera_ee/rgb/image_raw";
 //	std::string left_bag_topic = 	"left_camera/image_raw";

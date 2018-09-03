@@ -5,17 +5,17 @@ pointcloud_painter:
   max_lens_angle:           207 #30
   projection_type:          1
   neighbor_search_count:    1
-  depth_voxel_size:         0.01
-  flat_voxel_size:          0.03
-  spherical_voxel_size:     0.03
+  depth_voxel_size:         0.0001
+  flat_voxel_size:          0.0001
+  spherical_voxel_size:     0.0001
   compress_image:           true
-  image_compression_ratio:  2
+  image_compression_ratio:  1
   camera_frame_left:        left_camera_frame
   camera_frame_right:       right_camera_frame
   target_frame:             target_frame
-  bag_name_left:            /home/conor/catkin-ws/data/Highbay_Scans_SRS/pointcloud_painting_test/left_camera.bag
-  bag_name_right:           /home/conor/catkin-ws/data/Highbay_Scans_SRS/pointcloud_painting_test/right_camera.bag
-  bag_name_depth:           /home/conor/catkin-ws/data/Highbay_Scans_SRS/pointcloud_painting_test/with_cameras_scan.bag
+  bag_name_left:            /home/conor/ros_data/Fake_Walls/Camera_Data/second_run/2880_front_snapshot.bag    #Highbay_Scans_SRS/pointcloud_painting_test/left_camera.bag
+  bag_name_right:           /home/conor/ros_data/Fake_Walls/Camera_Data/second_run/2880_rear_snapshot.bag    #Highbay_Scans_SRS/pointcloud_painting_test/right_camera.bag
+  bag_name_depth:           /home/conor/ros_data/Fake_Walls/Camera_Data/second_run/1dps/full.bag    #Highbay_Scans_SRS/pointcloud_painting_test/with_cameras_scan.bag
   left_image_topic:         /camera1/usb_cam1/image_raw
-  right_image_topic:        /camera1/usb_cam1/image_raw
-  depth_cloud_topic:        /laser_stitcher/local_dense_cloud
+  right_image_topic:        /camera2/usb_cam2/image_raw
+  depth_cloud_topic:        /laser_stitcher/full_scan
