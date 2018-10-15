@@ -22,6 +22,8 @@ int main(int argc, char** argv)
 	// Type of projection (see pointcloud_painter/pointcloud_painter_srv)
 	int projection_type;
 	nh.param<int>("/pointcloud_painter/projection_type", projection_type, PAINTER_PROJ_EQUA_STEREO);
+	bool color_onto_depth;
+	nh.param<bool>("/pointcloud_painter/color_onto_depth", color_onto_depth, false);
 	int neighbor_search_count;
 	nh.param<int>("/pointcloud_painter/neighbor_search_count", neighbor_search_count, 3);
 	// Should this process loop? 
@@ -150,6 +152,7 @@ int main(int argc, char** argv)
 	srv.request.projections.push_back(projection_type);//1);
 	srv.request.max_image_angles.push_back(max_lens_angle);
 	srv.request.max_image_angles.push_back(max_lens_angle);//260);
+	srv.request.color_onto_depth = color_onto_depth;
 	srv.request.neighbor_search_count = neighbor_search_count;
 	// -------- Compression --------
 	// Raster-space Compression

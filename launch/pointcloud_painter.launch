@@ -26,7 +26,7 @@
   	> </node>
   	<node
 		name    = "sensor_tree_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
-      	args  	= "0.0 0.0 0.485 0.0 0.0 0.0 		/map  /sensor_tree 	100"
+      	args  	= "0.0 0.0 0.55 -0.55 0.0 0.0 		/map  /sensor_tree 	100"
   	> </node>
 	<node
 		name    = "target_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
@@ -38,7 +38,7 @@
   	> </node> 	
 	<node
 		name    = "right_cam_frame_publisher"   pkg = "tf"   type = "static_transform_publisher"
-      	args  	= "0.0 -0.076 -0.07 -0.8 1.57 -1.57  /target_frame  /right_camera_frame 		100"
+      	args  	= "0.0 -0.076 -0.07 0.0 1.57 -1.57  /target_frame  /right_camera_frame 		100"
   	> </node>
 
 </launch>

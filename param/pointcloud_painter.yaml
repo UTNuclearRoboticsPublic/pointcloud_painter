@@ -2,20 +2,23 @@
 pointcloud_painter:
   painter_service_name:     pointcloud_painter/paint
   should_loop:              false
-  max_lens_angle:           207 #30
-  projection_type:          1
-  neighbor_search_count:    1
-  depth_voxel_size:         0.0001
-  flat_voxel_size:          0.0001
-  spherical_voxel_size:     0.0001
-  compress_image:           true
+  max_lens_angle:           130
+  projection_type:          2
+  color_onto_depth:         true
+  neighbor_search_count:    3
+  voxelize_depth_cloud:     false
+  voxelize_rgb_images:      false
+  depth_voxel_size:         0.01
+  flat_voxel_size:          0.001
+  spherical_voxel_size:     0.002
+  compress_image:           false
   image_compression_ratio:  1
   camera_frame_left:        left_camera_frame
-  camera_frame_right:       right_camera_frame
+  camera_frame_right:       right_camera_frame 
   target_frame:             target_frame
-  bag_name_left:            /home/conor/ros_data/Fake_Walls/Camera_Data/second_run/2880_front_snapshot.bag    #Highbay_Scans_SRS/pointcloud_painting_test/left_camera.bag
-  bag_name_right:           /home/conor/ros_data/Fake_Walls/Camera_Data/second_run/2880_rear_snapshot.bag    #Highbay_Scans_SRS/pointcloud_painting_test/right_camera.bag
-  bag_name_depth:           /home/conor/ros_data/Fake_Walls/Camera_Data/second_run/1dps/full.bag    #Highbay_Scans_SRS/pointcloud_painting_test/with_cameras_scan.bag
+  bag_name_left:            /home/conor/ros_data/trees/7 under the canyon live oaks/2018-10-07-13-56-36.bag #/home/conor/ros_data/trees/17 ahg behind tml/2018-10-07-15-58-39.bag #/home/conor/ros_data/trees/37 freaky wall by EE and baby cypresses/2018-10-07-19-50-43.bag #/home/conor/ros_data/trees/temp_image.bag #/home/conor/ros_data/Fake_Walls/Camera_Data/second_run/2880_front_snapshot.bag    #Highbay_Scans_SRS/pointcloud_painting_test/left_camera.bag
+  bag_name_right:           /home/conor/ros_data/trees/7 under the canyon live oaks/2018-10-07-13-57-19.bag #/home/conor/ros_data/trees/17 ahg behind tml/2018-10-07-15-57-56.bag #/home/conor/ros_data/trees/37 freaky wall by EE and baby cypresses/2018-10-07-19-50-43.bag #/home/conor/ros_data/trees/temp_image.bag #/home/conor/ros_data/Fake_Walls/Camera_Data/second_run/2880_rear_snapshot.bag    #Highbay_Scans_SRS/pointcloud_painting_test/right_camera.bag
+  bag_name_depth:           /home/conor/ros_data/trees/7 under the canyon live oaks/laser_stitcher_1538938552.584077.bag #/home/conor/ros_data/trees/17 ahg behind tml/laser_stitcher_1538945713.777992.bag #/home/conor/ros_data/trees/37 freaky wall by EE and baby cypresses/laser_stitcher_1538959941.855078.bag #/home/conor/ros_data/trees/temp_scan.bag #/home/conor/ros_data/Fake_Walls/Camera_Data/second_run/1dps/full.bag    #Highbay_Scans_SRS/pointcloud_painting_test/with_cameras_scan.bag
   left_image_topic:         /camera1/usb_cam1/image_raw
-  right_image_topic:        /camera2/usb_cam2/image_raw
+  right_image_topic:        /camera1/usb_cam1/image_raw
   depth_cloud_topic:        /laser_stitcher/full_scan

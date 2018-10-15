@@ -6,12 +6,12 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /Spherical PCL Image1/Status1
+        - /Input Depth1
         - /Final Cloud1
         - /Final Cloud1/Status1
         - /TF1/Frames1
       Splitter Ratio: 0.650872827
-    Tree Height: 1526
+    Tree Height: 165
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -30,7 +30,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: Flat PCL Image
+    SyncSource: Final Cloud
 Visualization Manager:
   Class: ""
   Displays:
@@ -52,8 +52,8 @@ Visualization Manager:
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
+    - Alpha: 0
+      Autocompute Intensity Bounds: false
       Autocompute Value Bounds:
         Max Value: 10
         Min Value: -10
@@ -64,24 +64,24 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 4096
+      Max Intensity: 4500
       Min Color: 0; 0; 0
-      Min Intensity: 0
+      Min Intensity: 51.2531853
       Name: Input Depth
       Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.00999999978
+      Size (m): 0.0199999996
       Style: Flat Squares
       Topic: /input_depth_cloud
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -113,8 +113,8 @@ Visualization Manager:
       Use rainbow: true
       Value: false
     - Class: rviz/Image
-      Enabled: false
-      Image Topic: /front_camera/image_raw
+      Enabled: true
+      Image Topic: /input_imagery_left
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -123,10 +123,10 @@ Visualization Manager:
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
-      Value: false
+      Value: true
     - Class: rviz/Image
-      Enabled: false
-      Image Topic: /rear_camera/image_raw
+      Enabled: true
+      Image Topic: /input_imagery_right
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -135,7 +135,7 @@ Visualization Manager:
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -219,7 +219,7 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.00499999989
+      Size (m): 0.00100000005
       Style: Flat Squares
       Topic: /image_out_sphere
       Unreliable: false
@@ -249,7 +249,7 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.00499999989
+      Size (m): 0.00800000038
       Style: Flat Squares
       Topic: /final_cloud
       Unreliable: false
@@ -257,38 +257,19 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Class: rviz/TF
-      Enabled: true
+      Enabled: false
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        left_camera_frame:
-          Value: true
-        map:
-          Value: true
-        right_camera_frame:
-          Value: true
-        sensor_tree:
-          Value: true
-        target_frame:
-          Value: false
-        world:
-          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        world:
-          map:
-            sensor_tree:
-              target_frame:
-                left_camera_frame:
-                  {}
-                right_camera_frame:
-                  {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -314,35 +295,35 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.96566868
+      Distance: 15.2861128
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.310201287
-        Y: 1.3968426
-        Z: 0.782475173
+        X: -0.453017086
+        Y: -0.181339383
+        Z: 0.390155137
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.535203874
+      Pitch: 0.179797798
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.41316843
+      Yaw: 3.27860427
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
   Front Image Raw:
     collapsed: false
-  Height: 1767
+  Height: 876
   Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd00000004000000000000019300000644fc020000000cfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006600fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003100000644000000e400fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d006100670065010000027c000000830000000000000000fb0000000a0049006d0061006700650100000307000000ad0000000000000000fb0000001e00460072006f006e007400200049006d0061006700650020005200610077000000019d000002650000001b00fffffffb0000001c005200650061007200200049006d006100670065002000520061007700000001dc000001d80000001b00ffffff0000000100000122000002abfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730000000031000002ab000000c200fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000ae700000046fc0100000002fb0000000800540069006d0065010000000000000ae7000003de00fffffffb0000000800540069006d006501000000000000045000000000000000000000094c0000064400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000040000000000000193000002dafc020000000cfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006100fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000028000000e6000000d700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d0061006700650100000547000000830000000000000000fb0000000a0049006d00610067006501000005d0000000ad0000000000000000fb0000001e00460072006f006e007400200049006d00610067006500200052006100770100000114000000fb0000001600fffffffb0000001c005200650061007200200049006d00610067006500200052006100770100000215000000ed0000001600ffffff0000000100000122000002abfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730000000031000002ab000000ad00fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000ae7000000a9fc0100000003fb0000000a00560069006500770073030000004e00000080000002e100000197fb0000000a0049006d0061006700650100000000000005710000000000000000fb0000000a0049006d006100670065010000057700000570000000000000000000000003000005ff00000046fc0100000002fb0000000800540069006d00650100000000000005ff0000030000fffffffb0000000800540069006d0065010000000000000450000000000000000000000466000002da00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Rear Image Raw:
     collapsed: false
   Selection:
@@ -353,6 +334,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 2791
-  X: 89
-  Y: 33
+  Width: 1535
+  X: 2945
+  Y: 447

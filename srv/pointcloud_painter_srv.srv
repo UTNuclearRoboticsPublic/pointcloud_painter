@@ -30,6 +30,7 @@ float32 depth_voxel_size
 int32 neighbor_search_count
 string[] camera_frames
 string target_frame
+bool color_onto_depth
 
 
 # -----------------------------------------------------------------------------------------------------------------------------
