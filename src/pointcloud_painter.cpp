@@ -122,7 +122,7 @@ bool PointcloudPainter::paintPointcloud(pointcloud_painter::pointcloud_painter_s
 	for(int i=0; i<req.image_list.size(); i++)
 	{
 		// ------ Set up CV Object ------
-		cv_bridge::CvImagePtr image_ptr; 
+		cv_bridge::CvImagePtr image_ptr(new cv_bridge::CvImage); 
 		try
 		{
 			image_ptr = cv_bridge::toCvCopy(req.image_list[i], sensor_msgs::image_encodings::BGR8);
@@ -158,6 +158,7 @@ bool PointcloudPainter::paintPointcloud(pointcloud_painter::pointcloud_painter_s
 	if(req.voxelize_rgb_images)
 	{
 		// Voxelize Flat Cloud
+		int start_size = flat_image_pcl->points.size();
 		pcl::VoxelGrid<pcl::PointXYZRGB> vg;
 		vg.setInputCloud(flat_image_pcl);
 		vg.setLeafSize(req.flat_voxel_size, req.flat_voxel_size, req.flat_voxel_size);
@@ -166,9 +167,10 @@ bool PointcloudPainter::paintPointcloud(pointcloud_painter::pointcloud_painter_s
 		*flat_image_pcl = *temp_pcp;
 		// Time Debugging
 		time_elapsed = ros::Time::now() - start_time;
-		ROS_DEBUG_STREAM("voxelized flat image cloud " << time_elapsed);
+		ROS_DEBUG_STREAM("voxelized flat image cloud from " << start_size << " to " << flat_image_pcl->points.size() << " in " << time_elapsed << " time.");
 
 		// Voxelize Spherical Cloud (Collapsed)
+		start_size = spherical_image_pcl->points.size(); 
 		vg.setInputCloud(spherical_image_pcl);
 		vg.setLeafSize(req.spherical_voxel_size, req.spherical_voxel_size, req.spherical_voxel_size);
 		temp_pcp->points.clear();
@@ -176,7 +178,7 @@ bool PointcloudPainter::paintPointcloud(pointcloud_painter::pointcloud_painter_s
 		*spherical_image_pcl = *temp_pcp;
 		// Time Debugging
 		time_elapsed = ros::Time::now() - start_time;
-		ROS_DEBUG_STREAM("voxelized spherical image cloud " << time_elapsed);
+		ROS_DEBUG_STREAM("voxelized spherical image cloud from " << start_size << " to " << spherical_image_pcl->points.size() << " in " << time_elapsed << " time.");
 	}
 
 	res.image_voxelizing_time = time_elapsed.toSec();
@@ -383,11 +385,17 @@ bool PointcloudPainter::buildImageClouds(pcl::PointCloud<pcl::PointXYZRGB>::Ptr 
 					point_sphere.z = ( -1 + (pow(xs,2) + pow(ys,2))/2 );
 					break;
 				case PAINTER_PROJ_FLAT:
-					float point_distance = sqrt( pow(point_flat.x/image_hgt*plane_width,2) + pow(point_flat.y/image_hgt*plane_width,2) + pow(flat_image_distance,2) );
-					point_sphere.x = point_flat.x/point_distance;
-					point_sphere.y = point_flat.y/point_distance;
-					point_sphere.z = -flat_image_distance/point_distance;
-					
+					//float point_distance = sqrt( pow(point_flat.x/image_hgt*plane_width,2) + pow(point_flat.y/image_hgt*plane_width,2) + pow(flat_image_distance,2) );
+					//point_sphere.x = point_flat.x/point_distance;
+					//point_sphere.y = point_flat.y/point_distance;
+					//point_sphere.z = -flat_image_distance/point_distance;
+					float alpha = atan((1-2*float(i)/float(image_wdt))*tan(max_angle/2));
+					float max_angle_off = max_angle * float(image_hgt) / float(image_wdt);
+					float beta = atan((1-2*float(j)/float(image_hgt))*tan(max_angle_off/2));
+					point_sphere.x = cos(beta)*cos(alpha);//sin(alpha);
+					point_sphere.y = cos(beta)*sin(alpha);//sin(beta);
+					point_sphere.z = cos(beta);//sqrt(1 - pow(point_sphere.x,2) - pow(point_sphere.y,2));
+
 					break;
 			}
 

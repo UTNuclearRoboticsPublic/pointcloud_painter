@@ -182,6 +182,14 @@ int main(int argc, char** argv)
 		// Wait a moment to ensure that the service is up...
 		ros::Duration(1.0).sleep();
 
+		cv::Mat image;
+		image = cv::imread("/home/conor/Downloads/IMG_20190410_151038.jpg", 1); 
+		ROS_INFO_STREAM("image size: " << image.size().height << " by " << image.size().width);
+		cv_bridge::CvImagePtr image_ptr(new cv_bridge::CvImage);
+		image.copyTo(image_ptr->image);
+		//image_ptr->toImageMsg(srv.request.image_list[0]);
+		srv.request.image_list[0].encoding = srv.request.image_list[1].encoding;
+
 		// Call service
 		if( ! painter_srv.call(srv) )
 			ROS_WARN_STREAM("[PointcloudPainter] Painting service call failed - prob not up yet");
